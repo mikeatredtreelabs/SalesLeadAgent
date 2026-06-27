@@ -1,0 +1,384 @@
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, Brain, Star, Lightbulb, Mail, ClipboardList, Activity, Building2, Globe, Users, FileText, Zap, Loader2, CheckCircle2, AlertCircle, Copy, Check, Sparkles, Clock, MessageSquare, X } from 'lucide-react';
+import StatusBadge, { STATUS_COLORS } from '@/components/StatusBadge';
+import ScoreBadge from '@/components/ScoreBadge';
+
+const ALL_STATUSES = Object.keys(STATUS_COLORS);
+
+function AgentBtn({ label, icon: Icon, onClick, loading, done, disabled }: any) {
+  return (
+    <button onClick={onClick} disabled={loading || disabled}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all
+        ${done ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+          loading ? 'bg-blue-50 text-blue-600 border border-blue-200 cursor-wait' :
+          disabled ? 'bg-slate-50 text-slate-400 border border-slate-200 cursor-not-allowed' :
+          'bg-white text-slate-700 border border-slate-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50'}`}>
+      {loading ? <Loader2 size={14} className="animate-spin" /> : done ? <CheckCircle2 size={14} /> : <Icon size={14} />}
+      {label}
+    </button>
+  );
+}
+
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      className="p-1.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+      {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+    </button>
+  );
+}
+
+export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
+  const router = useRouter();
+  const [lead, setLead] = useState(initialLead);
+  const [tab, setTab] = useState('overview');
+  const [running, setRunning] = useState<Record<string, boolean>>({});
+  const [done, setDone] = useState<Record<string, boolean>>({
+    research: !!initialLead.research?.length,
+    score: !!initialLead.score,
+    opportunities: !!initialLead.opportunities?.length,
+    outreach: !!initialLead.outreach?.length,
+    callprep: !!initialLead.callPrep,
+  });
+  const [researchInput, setResearchInput] = useState(initialLead.notes || '');
+  const [error, setError] = useState<string | null>(null);
+
+  async function runAgentCall(agentName: string, extraBody = {}) {
+    setRunning(r => ({ ...r, [agentName]: true }));
+    setError(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent: agentName, input: researchInput, ...extraBody }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Agent failed');
+      setDone(d => ({ ...d, [agentName]: true }));
+      // Refresh lead data from server
+      const updated = await fetch(`/api/leads/${lead.id}`).then(r => r.json());
+      setLead(updated);
+    } catch (e: any) {
+      setError(`${agentName} failed: ${e.message}`);
+    }
+    setRunning(r => ({ ...r, [agentName]: false }));
+  }
+
+  async function updateStatus(status: string) {
+    await fetch(`/api/leads/${lead.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    setLead((l: any) => ({ ...l, status }));
+    router.refresh();
+  }
+
+  const research = lead.research?.[0];
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: Building2 },
+    { id: 'opportunities', label: 'Opportunities', icon: Lightbulb, badge: lead.opportunities?.length },
+    { id: 'outreach', label: 'Outreach', icon: MessageSquare },
+    { id: 'callprep', label: 'Call prep', icon: ClipboardList },
+    { id: 'activity', label: 'Activity', icon: Activity, badge: lead.activities?.length },
+  ];
+
+  const diffLabel: Record<number, string> = { 1: 'Very easy', 2: 'Easy', 3: 'Moderate', 4: 'Complex', 5: 'Advanced' };
+  const diffColor: Record<number, string> = { 1: 'bg-emerald-100 text-emerald-700', 2: 'bg-emerald-100 text-emerald-700', 3: 'bg-amber-100 text-amber-700', 4: 'bg-orange-100 text-orange-700', 5: 'bg-red-100 text-red-600' };
+  const contact = lead.contacts?.[0];
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-5">
+        <div>
+          <Link href="/leads" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-3 transition-colors">
+            <ArrowLeft size={14} /> All leads
+          </Link>
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Building2 size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-slate-900">{lead.companyName}</h1>
+              <p className="text-sm text-slate-500">{[lead.industry, lead.location].filter(Boolean).join(' · ')}</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 pt-6">
+          <ScoreBadge score={lead.score} />
+          <select value={lead.status} onChange={e => updateStatus(e.target.value)}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-600 focus:outline-none focus:border-blue-400 bg-white">
+            {ALL_STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Agent bar */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-5 flex flex-wrap gap-2">
+        <span className="text-xs text-slate-400 self-center mr-1">Agents:</span>
+        <AgentBtn label="Research" icon={Brain} onClick={() => runAgentCall('research')} loading={running.research} done={done.research} />
+        <AgentBtn label="Score" icon={Star} onClick={() => runAgentCall('score')} loading={running.score} done={done.score} />
+        <AgentBtn label="Opportunities" icon={Lightbulb} onClick={() => runAgentCall('opportunities')} loading={running.opportunities} done={done.opportunities} />
+        <AgentBtn label="Outreach" icon={Mail} onClick={() => runAgentCall('outreach')} loading={running.outreach} done={done.outreach} />
+        <AgentBtn label="Call prep" icon={ClipboardList} onClick={() => runAgentCall('callprep')} loading={running.callprep} done={done.callprep} />
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4 text-sm text-red-700">
+          <AlertCircle size={15} />{error}
+          <button onClick={() => setError(null)} className="ml-auto"><X size={14} /></button>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-slate-200 mb-5">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+            <t.icon size={14} />{t.label}
+            {(t.badge ?? 0) > 0 && <span className="bg-slate-200 text-slate-600 text-xs px-1.5 py-0.5 rounded-full leading-none">{t.badge}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Overview */}
+      {tab === 'overview' && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="col-span-2 space-y-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-slate-700">Research input</h3>
+                <span className="text-xs text-slate-400">Paste website text, LinkedIn, or notes</span>
+              </div>
+              <textarea value={researchInput} onChange={e => setResearchInput(e.target.value)} rows={4}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 resize-none bg-slate-50 placeholder-slate-400"
+                placeholder="Paste in content from their website, LinkedIn, or any intel you have." />
+              <button onClick={() => runAgentCall('research')} disabled={running.research}
+                className="mt-2 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                {running.research ? <><Loader2 size={14} className="animate-spin" />Researching...</> : <><Sparkles size={14} />Run Research Agent</>}
+              </button>
+            </div>
+            {research?.summary && (
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-700">Research summary</h3>
+                  {research.confidence && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{Math.round(research.confidence * 100)}% confidence</span>}
+                </div>
+                <p className="text-sm text-slate-700 leading-relaxed mb-4">{research.summary}</p>
+                {(research.painPoints as string[])?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-2">Likely pain points</p>
+                    <div className="space-y-1.5">
+                      {(research.painPoints as string[]).map((p, i) => (
+                        <div key={i} className="flex items-start gap-2 text-sm text-slate-600">
+                          <Zap size={13} className="text-amber-500 mt-0.5 flex-shrink-0" />{p}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {research.consultingAngle && (
+                  <div className="mt-4 bg-blue-50 border border-blue-100 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-blue-700 mb-1">Consulting angle</p>
+                    <p className="text-sm text-blue-800">{research.consultingAngle}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            {lead.scoreDetail && (
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-700">Score breakdown</h3>
+                  <span className={`text-xl font-bold ${lead.score >= 75 ? 'text-emerald-600' : lead.score >= 50 ? 'text-amber-600' : 'text-red-500'}`}>{lead.score}<span className="text-sm font-normal text-slate-400">/100</span></span>
+                </div>
+                <div className="space-y-2 mb-3">
+                  {[['Industry fit', lead.scoreDetail.industryFit, 20],['Manual process signals', lead.scoreDetail.manualProcessSignals, 20],['Document heaviness', lead.scoreDetail.documentHeaviness, 15],['Budget potential', lead.scoreDetail.budgetPotential, 10],['Background match', lead.scoreDetail.backgroundRelevance, 10],['Urgency signals', lead.scoreDetail.urgencySignals, 10],['Company size fit', lead.scoreDetail.companySize, 10],['Strategic value', lead.scoreDetail.strategicValue, 5]].map(([label, val, max]) => val != null && (
+                    <div key={label as string}>
+                      <div className="flex justify-between text-xs text-slate-500 mb-1"><span>{label}</span><span className="font-medium">{val}/{max}</span></div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${((val as number) / (max as number)) * 100}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 bg-slate-50 rounded-lg p-2.5 leading-relaxed">{lead.scoreDetail.explanation}</p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-slate-500 mb-3">Company</h3>
+              <div className="space-y-2.5">
+                {lead.website && <div className="flex items-center gap-2 text-sm"><Globe size={13} className="text-slate-400" /><a href={`https://${lead.website}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs truncate">{lead.website}</a></div>}
+                {lead.size && <div className="flex items-center gap-2 text-sm text-slate-600"><Users size={13} className="text-slate-400" />{lead.size}</div>}
+                {lead.location && <div className="flex items-center gap-2 text-sm text-slate-600"><Building2 size={13} className="text-slate-400" />{lead.location}</div>}
+                {lead.source && <div className="flex items-center gap-2 text-sm text-slate-600"><FileText size={13} className="text-slate-400" />via {lead.source}</div>}
+              </div>
+            </div>
+            {contact?.name && (
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <h3 className="text-xs font-semibold text-slate-500 mb-3">Primary contact</h3>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-xs font-semibold text-blue-700">
+                    {contact.name.split(' ').map((n: string) => n[0]).join('')}
+                  </div>
+                  <div><p className="text-sm font-medium text-slate-800">{contact.name}</p><p className="text-xs text-slate-500">{contact.title}</p></div>
+                </div>
+                {contact.email && <div className="flex items-center gap-2 text-xs text-slate-500"><Mail size={12} />{contact.email}</div>}
+              </div>
+            )}
+            {lead.notes && <div className="bg-amber-50 border border-amber-200 rounded-xl p-4"><h3 className="text-xs font-semibold text-amber-700 mb-2">Notes</h3><p className="text-xs text-amber-800 leading-relaxed">{lead.notes}</p></div>}
+          </div>
+        </div>
+      )}
+
+      {/* Opportunities */}
+      {tab === 'opportunities' && (
+        <div>
+          {!lead.opportunities?.length ? (
+            <div className="text-center py-16 bg-white border border-slate-200 rounded-xl">
+              <Lightbulb size={32} className="mx-auto mb-3 text-slate-300" />
+              <p className="text-sm font-medium text-slate-600 mb-1">No opportunities yet</p>
+              <p className="text-xs text-slate-400 mb-4">Run Research first, then generate opportunities</p>
+              <button onClick={() => runAgentCall('opportunities')} disabled={running.opportunities}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                {running.opportunities ? 'Generating...' : 'Generate Opportunities'}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              {lead.opportunities.map((op: any) => (
+                <div key={op.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-200 transition-colors">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-slate-800 leading-snug flex-1">{op.title}</h3>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ml-2 flex-shrink-0 ${diffColor[op.difficulty] || diffColor[3]}`}>{diffLabel[op.difficulty] || 'Moderate'}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-2 leading-relaxed">{op.problem}</p>
+                  <div className="bg-blue-50 rounded-lg p-2.5 mb-2"><p className="text-xs font-medium text-blue-700 mb-0.5">Solution</p><p className="text-xs text-blue-800">{op.solution}</p></div>
+                  <div className="bg-emerald-50 rounded-lg p-2.5 mb-3"><p className="text-xs font-medium text-emerald-700 mb-0.5">Business value</p><p className="text-xs text-emerald-800">{op.value}</p></div>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <div className="flex items-center gap-1"><Clock size={11} />{op.timeline}</div>
+                    <div className="font-semibold text-slate-700">${Math.round((op.valueLow || 0)/1000)}K–${Math.round((op.valueHigh || 0)/1000)}K</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Outreach */}
+      {tab === 'outreach' && (
+        <div className="space-y-4">
+          {!lead.outreach?.length ? (
+            <div className="text-center py-16 bg-white border border-slate-200 rounded-xl">
+              <Mail size={32} className="mx-auto mb-3 text-slate-300" />
+              <p className="text-sm font-medium text-slate-600 mb-1">No outreach generated yet</p>
+              <button onClick={() => runAgentCall('outreach')} disabled={running.outreach}
+                className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                {running.outreach ? 'Generating...' : 'Generate Outreach'}
+              </button>
+            </div>
+          ) : (
+            lead.outreach.map((msg: any) => (
+              <div key={msg.id} className="bg-white border border-slate-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold text-slate-700 capitalize">{msg.type === 'shortEmail' ? 'Short email' : msg.type === 'linkedin' ? 'LinkedIn message' : 'Executive email'}</span>
+                  <CopyBtn text={msg.subject ? `Subject: ${msg.subject}\n\n${msg.body}` : msg.body} />
+                </div>
+                {msg.subject && <p className="text-xs text-slate-500 mb-2 font-medium">Subject: <span className="text-slate-700">{msg.subject}</span></p>}
+                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg p-3">{msg.body}</p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Call Prep */}
+      {tab === 'callprep' && (
+        <div>
+          {!lead.callPrep ? (
+            <div className="text-center py-16 bg-white border border-slate-200 rounded-xl">
+              <ClipboardList size={32} className="mx-auto mb-3 text-slate-300" />
+              <p className="text-sm font-medium text-slate-600 mb-1">No call prep yet</p>
+              <button onClick={() => runAgentCall('callprep')} disabled={running.callprep}
+                className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                {running.callprep ? 'Generating...' : 'Generate Call Prep'}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <h3 className="text-xs font-semibold text-blue-700 mb-2">Suggested opening</h3>
+                  <p className="text-sm text-blue-900 leading-relaxed italic">"{lead.callPrep.opening}"</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3">Discovery questions</h3>
+                  <div className="space-y-3">
+                    {(lead.callPrep.questions as string[])?.map((q, i) => (
+                      <div key={i} className="flex items-start gap-2.5">
+                        <span className="w-5 h-5 bg-blue-100 rounded-full text-xs font-semibold text-blue-700 flex items-center justify-center flex-shrink-0 mt-0.5">{i+1}</span>
+                        <p className="text-sm text-slate-700">{q}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="bg-white border border-slate-200 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3">Objections & responses</h3>
+                  <div className="space-y-4">
+                    {(lead.callPrep.objections as any[])?.map((o, i) => (
+                      <div key={i} className="text-sm">
+                        <p className="font-medium text-slate-700 mb-1">"<em>{o.objection}</em>"</p>
+                        <p className="text-slate-600 bg-slate-50 rounded-lg p-2.5">{o.response}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+                  <h3 className="text-xs font-semibold text-violet-700 mb-2">Demo idea</h3>
+                  <p className="text-sm text-violet-900">{lead.callPrep.demoIdea}</p>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <h3 className="text-xs font-semibold text-emerald-700 mb-2">Recommended next step</h3>
+                  <p className="text-sm text-emerald-900">{lead.callPrep.nextStep}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Activity */}
+      {tab === 'activity' && (
+        <div>
+          {!lead.activities?.length ? (
+            <p className="text-center text-sm text-slate-400 py-8">No activity yet. Run agents to build history.</p>
+          ) : (
+            <div className="space-y-2">
+              {lead.activities.map((a: any) => (
+                <div key={a.id} className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3">
+                  <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Sparkles size={12} className="text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-slate-800">{a.action}</p>
+                      <span className="text-xs text-slate-400 flex-shrink-0">{new Date(a.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">{a.agent} · {a.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

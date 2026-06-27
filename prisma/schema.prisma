@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  leads         Lead[]
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  userId      String
+  companyName String
+  website     String?
+  industry    String?
+  location    String?
+  size        String?
+  status      String   @default("New")
+  score       Int?
+  source      String?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contacts    Contact[]
+  research    CompanyResearch[]
+  scoreDetail LeadScore?
+  opportunities Opportunity[]
+  outreach    OutreachMessage[]
+  callPrep    DiscoveryCallPrep?
+  activities  AgentActivity[]
+  followUps   FollowUpTask[]
+}
+
+model Contact {
+  id        String  @id @default(cuid())
+  leadId    String
+  name      String?
+  title     String?
+  email     String?
+  linkedin  String?
+  isPrimary Boolean @default(true)
+  lead      Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model CompanyResearch {
+  id             String   @id @default(cuid())
+  leadId         String
+  summary        String?  @db.Text
+  whatTheyDo     String?  @db.Text
+  techMaturity   String?
+  painPoints     Json?
+  consultingAngle String? @db.Text
+  assumptions    Json?
+  confidence     Float?
+  rawInput       String?  @db.Text
+  createdAt      DateTime @default(now())
+  lead           Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model LeadScore {
+  id                  String   @id @default(cuid())
+  leadId              String   @unique
+  total               Int
+  industryFit         Int?
+  manualProcessSignals Int?
+  documentHeaviness   Int?
+  budgetPotential     Int?
+  backgroundRelevance Int?
+  urgencySignals      Int?
+  companySize         Int?
+  strategicValue      Int?
+  explanation         String?  @db.Text
+  createdAt           DateTime @default(now())
+  lead                Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model Opportunity {
+  id          String   @id @default(cuid())
+  leadId      String
+  title       String
+  problem     String?  @db.Text
+  solution    String?  @db.Text
+  value       String?  @db.Text
+  difficulty  Int?
+  timeline    String?
+  valueLow    Int?
+  valueHigh   Int?
+  category    String?
+  createdAt   DateTime @default(now())
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model OutreachMessage {
+  id          String    @id @default(cuid())
+  leadId      String
+  type        String
+  subject     String?
+  body        String    @db.Text
+  editedBody  String?   @db.Text
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model DiscoveryCallPrep {
+  id          String   @id @default(cuid())
+  leadId      String   @unique
+  opening     String?  @db.Text
+  questions   Json?
+  objections  Json?
+  demoIdea    String?  @db.Text
+  nextStep    String?  @db.Text
+  createdAt   DateTime @default(now())
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model AgentActivity {
+  id        String   @id @default(cuid())
+  leadId    String
+  agent     String
+  action    String
+  detail    String?  @db.Text
+  createdAt DateTime @default(now())
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model FollowUpTask {
+  id        String    @id @default(cuid())
+  leadId    String
+  title     String
+  dueDate   DateTime?
+  completed Boolean   @default(false)
+  source    String    @default("manual")
+  createdAt DateTime  @default(now())
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
