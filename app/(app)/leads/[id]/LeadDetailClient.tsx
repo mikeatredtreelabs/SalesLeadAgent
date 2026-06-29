@@ -194,6 +194,8 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
     }
     setDemoArtifactLoading(s => ({ ...s, [id]: false }));
   }
+
+  async function updateStatus(status: string) {
     await fetch(`/api/leads/${lead.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
