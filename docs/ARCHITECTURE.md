@@ -238,3 +238,67 @@ Vercel auto-detects Next.js. Set the 4 required env vars in the Vercel dashboard
 - **Email integration** — send outreach directly from the app (with human approval step)
 - **Kanban pipeline view** — drag-and-drop lead status board
 - **Multi-user / team** — share leads and pipeline across a small team
+
+---
+
+## White-Label / Multi-Tenant System
+
+The app is built for white-labeling from the ground up. Each tenant gets their own branding — name, colors, logo — with zero code changes required.
+
+### How it works
+
+Tenant config lives in `config/tenant.ts`. The active tenant is controlled by the `NEXT_PUBLIC_TENANT` environment variable. Set it in `.env` and redeploy.
+
+```bash
+# .env
+NEXT_PUBLIC_TENANT="redtreeai"   # Red Tree AI (red/black)
+NEXT_PUBLIC_TENANT="default"     # SalesLeadAgent (blue)
+```
+
+### Adding a new tenant
+
+Add a new entry to the `tenants` object in `config/tenant.ts`:
+
+```ts
+acmecorp: {
+  name: 'Acme Corp AI',
+  shortName: 'Acme',
+  tagline: 'AI-powered sales',
+  logoText: 'AC',
+  colors: {
+    primary: '#7c3aed',          // violet-600
+    primaryHover: '#6d28d9',     // violet-700
+    primaryLight: '#f5f3ff',     // violet-50
+    primaryLightText: '#5b21b6', // violet-800
+    accent: '#0ea5e9',
+    sidebar: '#ffffff',
+    sidebarBorder: '#e2e8f0',
+  },
+  seedEmail: 'admin@acmecorp.com',
+},
+```
+
+Then deploy with `NEXT_PUBLIC_TENANT=acmecorp`.
+
+### Current tenants
+
+| Key | Name | Colors | Sidebar |
+|---|---|---|---|
+| `redtreeai` | Red Tree AI | Red + Black | Dark black sidebar |
+| `default` | SalesLeadAgent | Blue | White sidebar |
+
+### Tenant config fields
+
+| Field | Description |
+|---|---|
+| `name` | Full company name (shown in sidebar, page title) |
+| `shortName` | Short version |
+| `tagline` | Subtitle under logo |
+| `logoText` | 2-letter monogram shown in logo square |
+| `colors.primary` | Main brand color — buttons, active nav, links |
+| `colors.primaryHover` | Hover state for buttons |
+| `colors.primaryLight` | Light tint for badges and highlights |
+| `colors.primaryLightText` | Text color on light backgrounds |
+| `colors.accent` | Secondary accent color |
+| `colors.sidebar` | Sidebar background (use dark hex for dark sidebar) |
+| `colors.sidebarBorder` | Sidebar border and dividers |
