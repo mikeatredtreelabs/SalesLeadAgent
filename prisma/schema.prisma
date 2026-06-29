@@ -12,7 +12,11 @@ model User {
   email         String    @unique
   name          String?
   password      String?
-  createdAt     DateTime  @default(now())
+  googleAccessToken  String? @db.Text
+  googleRefreshToken String? @db.Text
+  googleTokenExpiry  DateTime?
+  gmailConnected     Boolean @default(false)
+  createdAt    DateTime  @default(now())
   leads         Lead[]
   sessions      Session[]
   accounts      Account[]

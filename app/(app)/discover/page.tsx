@@ -97,6 +97,19 @@ export default function DiscoverPage() {
     const toImport = [...selected];
     await Promise.all(toImport.map(async (i) => {
       const c = compResult.competitors[i];
+      // Try to find a decision-maker contact via Apollo before creating the lead
+      let contact = null;
+      if (c.website) {
+        try {
+          const contactRes = await fetch('/api/apollo-contacts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ website: c.website, companyName: c.companyName }),
+          });
+          const contactData = await contactRes.json();
+          contact = contactData.contacts?.[0] || null;
+        } catch {}
+      }
       await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,6 +117,7 @@ export default function DiscoverPage() {
           companyName: c.companyName, website: c.website, industry: c.industry,
           location: c.location, size: c.size, notes: c.reason,
           source: `Competitor of ${compResult.companyName}`,
+          contact,
         }),
       });
     }));
@@ -369,8 +383,19 @@ export default function DiscoverPage() {
                       <p className="text-sm font-semibold text-slate-800">{c.companyName}</p>
                       <p className="text-xs text-slate-500">{[c.industry, c.location, c.size].filter(Boolean).join(' · ')}</p>
                     </div>
+                    {c.contact?.name ? (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                        <Users size={12} className="text-emerald-600" />
+                        <div>
+                          <p className="text-xs font-medium text-emerald-800">{c.contact.name}</p>
+                          <p className="text-xs text-emerald-600">{c.contact.title}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 px-3 py-1.5">No contact found</span>
+                    )}
                     <button onClick={() => apolloImport(c)} disabled={apolloImporting.has(c.companyName)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 disabled:opacity-50 transition-colors">
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 disabled:opacity-50 transition-colors flex-shrink-0">
                       {apolloImporting.has(c.companyName) ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                       {apolloImporting.has(c.companyName) ? 'Added' : 'Add lead'}
                     </button>

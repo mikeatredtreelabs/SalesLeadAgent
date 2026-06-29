@@ -302,3 +302,46 @@ Then deploy with `NEXT_PUBLIC_TENANT=acmecorp`.
 | `colors.accent` | Secondary accent color |
 | `colors.sidebar` | Sidebar background (use dark hex for dark sidebar) |
 | `colors.sidebarBorder` | Sidebar border and dividers |
+
+---
+
+## Apollo Contact Auto-Population
+
+When a company is discovered (via the competitor finder or Apollo industry search), the app automatically searches Apollo's people database for a decision-maker contact at that company.
+
+**Title priority order:** CEO, COO, President, Owner, Founder, VP Operations, Director of Operations, Head of Operations, CTO, IT Director.
+
+**Where it's used:**
+- `POST /api/apollo-contacts` — standalone endpoint, given a website/company name, returns top decision-maker contacts
+- `POST /api/discover` — auto-fetches one contact per company found via Apollo's industry search
+- Competitor finder's `importSelected()` — fetches a contact for each selected competitor before creating the lead
+
+If Apollo can't find a contact (or the API key isn't set), leads are created without contact info — same as before, no degradation.
+
+---
+
+## CSV Export
+
+`GET /api/leads/export` streams a CSV of all leads with contact info, status, score, and source. Available via the **Export CSV** button on the Leads list page. Useful for one-off CRM imports (HubSpot, Salesforce, Pipedrive all accept CSV import).
+
+---
+
+## Gmail Send Integration
+
+Lets you send generated outreach emails directly from the Lead Detail page without copy-pasting into your email client.
+
+**OAuth flow:**
+1. Settings page → **Connect Gmail** → redirects to Google's consent screen requesting `gmail.send` scope
+2. Google redirects back to `/api/gmail/callback` with an auth code
+3. App exchanges the code for an access token + refresh token, stored on the `User` record
+4. Tokens auto-refresh on each send if expired
+
+**Sending a message:**
+On the Outreach tab, email-type messages (not LinkedIn) show a **Send via Gmail** button. Clicking it prompts for the recipient's email (pre-filled from the lead's primary contact if available), then sends via the Gmail API. The corresponding `OutreachMessage.sentAt` field is set on success — this is the same field used to track "has this been sent" without ever auto-sending without explicit confirmation.
+
+**Setup requirements:**
+1. Create a project at console.cloud.google.com
+2. Enable the Gmail API
+3. Create OAuth 2.0 credentials (Web application type)
+4. Add `${NEXTAUTH_URL}/api/gmail/callback` as an authorized redirect URI
+5. Add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to `.env`

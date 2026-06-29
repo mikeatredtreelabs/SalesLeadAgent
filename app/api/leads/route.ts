@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       source: body.source,
       status: 'New',
       contacts: body.contact?.name ? {
-        create: { name: body.contact.name, title: body.contact.title, email: body.contact.email, isPrimary: true }
+        create: { name: body.contact.name, title: body.contact.title, email: body.contact.email, linkedin: body.contact.linkedin, isPrimary: true }
       } : undefined,
     },
     include: { contacts: true },

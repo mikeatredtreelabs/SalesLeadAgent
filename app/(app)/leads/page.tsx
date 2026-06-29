@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Brain, ChevronRight, Plus } from 'lucide-react';
+import { Building2, Brain, ChevronRight, Plus, Download } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import ScoreBadge from '@/components/ScoreBadge';
 
@@ -36,10 +36,16 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             {leads.length} {params.status && params.status !== 'All' ? params.status.toLowerCase() : 'total'} leads
           </p>
         </div>
-        <Link href="/leads/new"
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
-          <Plus size={15} /> Add lead
-        </Link>
+        <div className="flex items-center gap-2">
+          <a href="/api/leads/export"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:border-slate-300 hover:bg-slate-50 transition-colors">
+            <Download size={15} /> Export CSV
+          </a>
+          <Link href="/leads/new"
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+            <Plus size={15} /> Add lead
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-2 mb-5 flex-wrap">

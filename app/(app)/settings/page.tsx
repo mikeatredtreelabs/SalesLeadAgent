@@ -2,11 +2,18 @@ export const dynamic = 'force-dynamic';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { prisma } from '@/lib/prisma';
 import ChangePasswordForm from './ChangePasswordForm';
+import GmailConnectCard from './GmailConnectCard';
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
+
+  const user = await prisma.user.findUnique({
+    where: { id: (session.user as any).id },
+    select: { gmailConnected: true, email: true },
+  });
 
   return (
     <div>
@@ -37,12 +44,16 @@ export default async function SettingsPage() {
               <div><span className="text-slate-400">NEXTAUTH_SECRET</span> ✓</div>
               <div><span className="text-slate-400">ANTHROPIC_API_KEY</span> {process.env.ANTHROPIC_API_KEY ? '✓' : '✗ missing'}</div>
               <div><span className="text-slate-400">APOLLO_API_KEY</span> {process.env.APOLLO_API_KEY ? '✓' : 'not set'}</div>
+              <div><span className="text-slate-400">GOOGLE_CLIENT_ID</span> {process.env.GOOGLE_CLIENT_ID ? '✓' : 'not set'}</div>
             </div>
           </div>
         </div>
 
         {/* Change password */}
         <ChangePasswordForm />
+
+        {/* Gmail connect */}
+        <GmailConnectCard connected={!!user?.gmailConnected} email={user?.email} />
       </div>
     </div>
   );

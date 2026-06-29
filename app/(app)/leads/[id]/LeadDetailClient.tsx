@@ -8,6 +8,61 @@ import ScoreBadge from '@/components/ScoreBadge';
 
 const ALL_STATUSES = Object.keys(STATUS_COLORS);
 
+function SendEmailButton({ msg, contactEmail }: { msg: any; contactEmail?: string }) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(!!msg.sentAt);
+  const [error, setError] = useState('');
+  const [showInput, setShowInput] = useState(false);
+  const [toEmail, setToEmail] = useState(contactEmail || '');
+
+  async function send() {
+    if (!toEmail.trim()) { setShowInput(true); return; }
+    setSending(true);
+    setError('');
+    try {
+      const res = await fetch('/api/gmail/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: toEmail, subject: msg.subject, body: msg.body, outreachMessageId: msg.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Send failed');
+      setSent(true);
+      setShowInput(false);
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setSending(false);
+  }
+
+  if (sent) {
+    return (
+      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
+        <CheckCircle2 size={11} /> Sent
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {showInput && (
+        <input
+          value={toEmail}
+          onChange={e => setToEmail(e.target.value)}
+          placeholder="recipient@company.com"
+          className="px-2 py-1 rounded border border-slate-200 text-xs w-44 focus:outline-none focus:border-blue-400"
+        />
+      )}
+      <button onClick={send} disabled={sending}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-all disabled:opacity-50">
+        {sending ? <Loader2 size={11} className="animate-spin" /> : <Mail size={11} />}
+        {sending ? 'Sending...' : showInput ? 'Confirm send' : 'Send via Gmail'}
+      </button>
+      {error && <span className="text-xs text-red-500">{error}</span>}
+    </div>
+  );
+}
+
 function AgentBtn({ label, icon: Icon, onClick, loading, done, disabled }: any) {
   return (
     <button onClick={onClick} disabled={loading || disabled}
@@ -705,7 +760,10 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
               <div key={msg.id} className="bg-white border border-slate-200 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-semibold text-slate-700 capitalize">{msg.type === 'shortEmail' ? 'Short email' : msg.type === 'linkedin' ? 'LinkedIn message' : 'Executive email'}</span>
-                  <CopyBtn text={msg.subject ? `Subject: ${msg.subject}\n\n${msg.body}` : msg.body} />
+                  <div className="flex items-center gap-2">
+                    {msg.type !== 'linkedin' && <SendEmailButton msg={msg} contactEmail={contact?.email} />}
+                    <CopyBtn text={msg.subject ? `Subject: ${msg.subject}\n\n${msg.body}` : msg.body} />
+                  </div>
                 </div>
                 {msg.subject && <p className="text-xs text-slate-500 mb-2 font-medium">Subject: <span className="text-slate-700">{msg.subject}</span></p>}
                 <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg p-3">{msg.body}</p>
