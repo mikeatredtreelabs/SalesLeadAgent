@@ -34,12 +34,12 @@ export default async function Dashboard() {
   const recent = leads.slice(0, 5);
 
   const stats = [
-    { label: 'Total leads', value: total, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-    { label: 'Avg score', value: avgScore ? `${avgScore}` : '—', suffix: avgScore ? '/100' : '', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-    { label: 'Outreach ready', value: qualified, icon: Mail, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    { label: 'Meetings booked', value: meetings, icon: CheckCircle2, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100' },
-    { label: 'Won', value: won, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
-    { label: 'Follow-up needed', value: followUp, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+    { label: 'Total leads', value: total, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', href: '/leads' },
+    { label: 'Avg score', value: avgScore ? `${avgScore}` : '—', suffix: avgScore ? '/100' : '', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', href: null },
+    { label: 'Outreach ready', value: qualified, icon: Mail, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', href: '/leads?status=Outreach+Ready' },
+    { label: 'Meetings booked', value: meetings, icon: CheckCircle2, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100', href: '/leads?status=Meeting+Scheduled' },
+    { label: 'Won', value: won, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100', href: '/leads?status=Won' },
+    { label: 'Follow-up needed', value: followUp, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', href: '/followups' },
   ];
 
   // Pipeline breakdown
@@ -62,17 +62,29 @@ export default async function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-6 gap-4 mb-8">
-        {stats.map(s => (
-          <div key={s.label} className={`bg-white border ${s.border} rounded-xl p-4`}>
-            <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center mb-3`}>
-              <s.icon size={15} className={s.color} />
+        {stats.map(s => {
+          const inner = (
+            <>
+              <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center mb-3`}>
+                <s.icon size={15} className={s.color} />
+              </div>
+              <div className={`text-2xl font-bold ${s.color} leading-none mb-1`}>
+                {s.value}{(s as any).suffix && <span className="text-sm font-normal text-slate-400">{(s as any).suffix}</span>}
+              </div>
+              <p className="text-xs text-slate-500">{s.label}</p>
+            </>
+          );
+          return s.href ? (
+            <Link key={s.label} href={s.href}
+              className={`bg-white border ${s.border} rounded-xl p-4 hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer`}>
+              {inner}
+            </Link>
+          ) : (
+            <div key={s.label} className={`bg-white border ${s.border} rounded-xl p-4`}>
+              {inner}
             </div>
-            <div className={`text-2xl font-bold ${s.color} leading-none mb-1`}>
-              {s.value}{(s as any).suffix && <span className="text-sm font-normal text-slate-400">{(s as any).suffix}</span>}
-            </div>
-            <p className="text-xs text-slate-500">{s.label}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Pipeline bar */}
