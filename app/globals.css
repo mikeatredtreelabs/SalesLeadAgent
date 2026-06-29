@@ -1,12 +1,3 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  --color-primary: var(--tenant-primary, #2563eb);
-  --color-primary-hover: var(--tenant-primary-hover, #1d4ed8);
-  --color-primary-light: var(--tenant-primary-light, #eff6ff);
-  --color-primary-light-text: var(--tenant-primary-light-text, #1e40af);
-  --color-sidebar: var(--tenant-sidebar, #ffffff);
-  --color-sidebar-border: var(--tenant-sidebar-border, #e2e8f0);
-}

@@ -14,23 +14,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const tenant = getTenant();
-  const { colors } = tenant;
-
   return (
     <html lang="en">
-      <head>
-        <style>{`
-          :root {
-            --tenant-primary: ${colors.primary};
-            --tenant-primary-hover: ${colors.primaryHover};
-            --tenant-primary-light: ${colors.primaryLight};
-            --tenant-primary-light-text: ${colors.primaryLightText};
-            --tenant-sidebar: ${colors.sidebar};
-            --tenant-sidebar-border: ${colors.sidebarBorder};
-          }
-        `}</style>
-      </head>
       <body className={`${inter.className} antialiased`}>{children}</body>
     </html>
   );
