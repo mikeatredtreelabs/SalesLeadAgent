@@ -7,11 +7,12 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { website } = await req.json();
+  const { website, sizeRanges } = await req.json();
   if (!website) return NextResponse.json({ error: 'Website required' }, { status: 400 });
 
-  // Step 1: fetch the website content
   const domain = website.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+
+  // Fetch website content
   let siteContent = '';
   try {
     const res = await fetch(`https://${domain}`, {
@@ -19,7 +20,6 @@ export async function POST(req: NextRequest) {
       signal: AbortSignal.timeout(8000),
     });
     const html = await res.text();
-    // Strip HTML tags and collapse whitespace
     siteContent = html
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -27,14 +27,19 @@ export async function POST(req: NextRequest) {
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 3000);
-  } catch (e) {
+  } catch {
     siteContent = `Company website: ${domain}`;
   }
 
-  // Step 2: use Claude to identify the company and find competitors
+  // Build size constraint instruction for the prompt
+  const sizeInstruction = sizeRanges && sizeRanges.length > 0
+    ? `IMPORTANT: Only return competitors that match these company size ranges: ${sizeRanges.map((r: any) => `${r.min}–${r.max === 10000 ? '500+' : r.max} employees`).join(' or ')}. Filter out any competitors outside these ranges.`
+    : 'Return competitors of any size.';
+
   try {
     const result = await runAgent(
       `You are a business research analyst. Given a company's website content, identify what the company does and return a list of their direct competitors.
+${sizeInstruction}
 Return ONLY valid JSON, no markdown, no preamble.
 Return exactly this shape:
 {
@@ -47,12 +52,12 @@ Return exactly this shape:
       "website": "domain.com",
       "industry": "industry",
       "location": "City, State if known",
-      "size": "approximate size if known",
+      "size": "approximate employee count or range",
       "reason": "one sentence on why they compete"
     }
   ]
 }
-Return 6-8 competitors. Only include real, verifiable companies. If you are not confident about a detail, omit it rather than guess.`,
+Return 6-8 competitors that match the size criteria. Only include real, verifiable companies. If you are not confident about a detail, omit it rather than guess.`,
       `Website domain: ${domain}
 Website content: ${siteContent}
 

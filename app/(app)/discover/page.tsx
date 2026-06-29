@@ -1,15 +1,22 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Loader2, Building2, AlertCircle, Globe, CheckSquare, Square, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { Search, Plus, Loader2, Building2, AlertCircle, Globe, CheckSquare, Square, ChevronDown, ChevronUp, Sparkles, Users } from 'lucide-react';
 
 const INDUSTRIES = ['Logistics','Freight','Import/Export','Distribution','Wholesale','Manufacturing','Supply Chain','Transportation','Customs Brokerage','Trade Finance'];
+
+const SIZE_FILTERS = [
+  { label: 'Small business', description: '1–50 employees', min: 1, max: 50 },
+  { label: 'Medium', description: '51–500 employees', min: 51, max: 500 },
+  { label: 'Enterprise', description: '500+ employees', min: 500, max: 10000 },
+];
 
 export default function DiscoverPage() {
   const router = useRouter();
 
   // Competitor finder state
   const [compWebsite, setCompWebsite] = useState('');
+  const [compSizes, setCompSizes] = useState<string[]>([]);
   const [compLoading, setCompLoading] = useState(false);
   const [compResult, setCompResult] = useState<any>(null);
   const [compError, setCompError] = useState('');
@@ -27,13 +34,23 @@ export default function DiscoverPage() {
   const [apolloImporting, setApolloImporting] = useState<Set<string>>(new Set());
   const [showApollo, setShowApollo] = useState(false);
 
+  function toggleCompSize(label: string) {
+    setCompSizes(s => s.includes(label) ? s.filter(x => x !== label) : [...s, label]);
+  }
+
   async function findCompetitors() {
     if (!compWebsite.trim()) return;
     setCompLoading(true); setCompError(''); setCompResult(null); setSelected(new Set()); setImportDone(new Set());
+
+    // Build size ranges from selected filters
+    const sizeRanges = compSizes.length > 0
+      ? SIZE_FILTERS.filter(s => compSizes.includes(s.label)).map(s => ({ min: s.min, max: s.max }))
+      : null;
+
     const res = await fetch('/api/competitors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ website: compWebsite.trim() }),
+      body: JSON.stringify({ website: compWebsite.trim(), sizeRanges }),
     });
     const data = await res.json();
     if (!res.ok) setCompError(data.error || 'Search failed');
@@ -127,9 +144,10 @@ export default function DiscoverPage() {
           <Sparkles size={16} className="text-blue-600" />
           <h2 className="text-sm font-semibold text-slate-800">Competitor finder</h2>
         </div>
-        <p className="text-xs text-slate-500 mb-4">Enter any company website and AI will identify their competitors — then add them as leads in one click.</p>
+        <p className="text-xs text-slate-500 mb-5">Enter any company website and AI will identify their competitors — then add them as leads in one click.</p>
 
-        <div className="flex gap-3">
+        {/* Website input */}
+        <div className="flex gap-3 mb-5">
           <div className="relative flex-1">
             <Globe size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -144,8 +162,49 @@ export default function DiscoverPage() {
             onClick={findCompetitors}
             disabled={compLoading || !compWebsite.trim()}
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {compLoading ? <><Loader2 size={14} className="animate-spin" />Researching...</> : <><Search size={14} />Find competitors</>}
+            {compLoading
+              ? <><Loader2 size={14} className="animate-spin" />Researching...</>
+              : <><Search size={14} />Find competitors</>}
           </button>
+        </div>
+
+        {/* Company size filter */}
+        <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+          <div className="flex items-center gap-2 mb-3">
+            <Users size={14} className="text-slate-500" />
+            <p className="text-xs font-semibold text-slate-600">Filter by company size</p>
+            {compSizes.length > 0 && (
+              <button onClick={() => setCompSizes([])} className="ml-auto text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {SIZE_FILTERS.map(s => {
+              const active = compSizes.includes(s.label);
+              return (
+                <button
+                  key={s.label}
+                  onClick={() => toggleCompSize(s.label)}
+                  className={`flex flex-col items-start px-4 py-3 rounded-lg border text-left transition-all ${
+                    active
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+                  }`}>
+                  <span className="text-sm font-semibold leading-none mb-1">{s.label}</span>
+                  <span className={`text-xs ${active ? 'text-blue-100' : 'text-slate-400'}`}>{s.description}</span>
+                </button>
+              );
+            })}
+          </div>
+          {compSizes.length === 0 && (
+            <p className="text-xs text-slate-400 mt-2.5 text-center">No filter selected — will return competitors of all sizes</p>
+          )}
+          {compSizes.length > 0 && (
+            <p className="text-xs text-blue-600 mt-2.5 text-center font-medium">
+              Filtering for: {compSizes.join(', ')}
+            </p>
+          )}
         </div>
 
         {compError && (
@@ -161,6 +220,9 @@ export default function DiscoverPage() {
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-4">
               <p className="text-xs font-semibold text-blue-700 mb-0.5">{compResult.companyName} · {compResult.industry}</p>
               <p className="text-xs text-blue-800">{compResult.description}</p>
+              {compSizes.length > 0 && (
+                <p className="text-xs text-blue-600 mt-1">Showing: {compSizes.join(', ')} competitors</p>
+              )}
             </div>
 
             {/* Select all + import bar */}
@@ -195,10 +257,11 @@ export default function DiscoverPage() {
                     key={i}
                     onClick={() => !isDone && toggleSelect(i)}
                     className={`flex items-center gap-4 rounded-xl px-4 py-3.5 border cursor-pointer transition-all
-                      ${isDone ? 'bg-emerald-50 border-emerald-200 cursor-default opacity-75' :
-                        isSelected ? 'bg-blue-50 border-blue-300' :
-                        'bg-white border-slate-200 hover:border-blue-200 hover:bg-slate-50'}`}>
-                    {/* Checkbox */}
+                      ${isDone
+                        ? 'bg-emerald-50 border-emerald-200 cursor-default opacity-75'
+                        : isSelected
+                          ? 'bg-blue-50 border-blue-300'
+                          : 'bg-white border-slate-200 hover:border-blue-200 hover:bg-slate-50'}`}>
                     <div className="flex-shrink-0">
                       {isDone
                         ? <CheckSquare size={18} className="text-emerald-500" />
@@ -206,21 +269,23 @@ export default function DiscoverPage() {
                           ? <CheckSquare size={18} className="text-blue-600" />
                           : <Square size={18} className="text-slate-300" />}
                     </div>
-                    {/* Company info */}
                     <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
                       <Building2 size={14} className="text-slate-500" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-slate-800">{c.companyName}</p>
                         {c.website && (
                           <a href={`https://${c.website}`} target="_blank" rel="noreferrer"
                             onClick={e => e.stopPropagation()}
                             className="text-xs text-blue-500 hover:underline">{c.website}</a>
                         )}
+                        {c.size && (
+                          <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{c.size}</span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {[c.industry, c.location, c.size].filter(Boolean).join(' · ')}
+                        {[c.industry, c.location].filter(Boolean).join(' · ')}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5 italic">{c.reason}</p>
                     </div>
