@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -114,19 +113,19 @@ model LeadScore {
 }
 
 model Opportunity {
-  id        String   @id @default(cuid())
-  leadId    String
-  title     String
-  problem   String?  @db.Text
-  solution  String?  @db.Text
-  value     String?  @db.Text
+  id         String   @id @default(cuid())
+  leadId     String
+  title      String
+  problem    String?  @db.Text
+  solution   String?  @db.Text
+  value      String?  @db.Text
   difficulty Int?
-  timeline  String?
-  valueLow  Int?
-  valueHigh Int?
-  category  String?
-  createdAt DateTime @default(now())
-  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  timeline   String?
+  valueLow   Int?
+  valueHigh  Int?
+  category   String?
+  createdAt  DateTime @default(now())
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
 }
 
 model OutreachMessage {
@@ -142,15 +141,15 @@ model OutreachMessage {
 }
 
 model DiscoveryCallPrep {
-  id        String   @id @default(cuid())
-  leadId    String   @unique
-  opening   String?  @db.Text
-  questions Json?
+  id         String   @id @default(cuid())
+  leadId     String   @unique
+  opening    String?  @db.Text
+  questions  Json?
   objections Json?
-  demoIdea  String?  @db.Text
-  nextStep  String?  @db.Text
-  createdAt DateTime @default(now())
-  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  demoIdea   String?  @db.Text
+  nextStep   String?  @db.Text
+  createdAt  DateTime @default(now())
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
 }
 
 model AgentActivity {
