@@ -4,8 +4,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex bg-slate-50 min-h-screen">
       <Sidebar />
-      <main className="ml-56 flex-1 p-6 overflow-y-auto min-h-screen">
-        <div className="max-w-5xl mx-auto">
+      <main className="ml-60 flex-1 min-h-screen">
+        {/* Top bar */}
+        <div className="h-14 bg-white border-b border-slate-200 flex items-center px-8 sticky top-0 z-20">
+          <div className="flex-1" />
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Agents ready
+          </div>
+        </div>
+        {/* Content */}
+        <div className="p-8 max-w-7xl mx-auto">
           {children}
         </div>
       </main>
