@@ -50,12 +50,17 @@ Return ONLY a JSON object: { "explanation": "your full explanation here with par
     const t3 = Date.now();
     console.log(`[elaborate] Claude call: ${t3 - t2}ms`);
 
-    await prisma.opportunity.update({
-      where: { id: opportunity.id },
-      data: { elaboration: result.explanation },
-    });
-    const t4 = Date.now();
-    console.log(`[elaborate] DB save: ${t4 - t3}ms | total: ${t4 - t0}ms`);
+    try {
+      await prisma.opportunity.update({
+        where: { id: opportunity.id },
+        data: { elaboration: result.explanation },
+      });
+      const t4 = Date.now();
+      console.log(`[elaborate] DB save: ${t4 - t3}ms | total: ${t4 - t0}ms`);
+    } catch (saveErr: any) {
+      console.error(`[elaborate] DB SAVE FAILED:`, saveErr.message);
+      console.error(`[elaborate] This likely means 'npx prisma db push' has not been run to add the elaboration column`);
+    }
 
     return NextResponse.json({ explanation: result.explanation, cached: false });
   } catch (e: any) {
