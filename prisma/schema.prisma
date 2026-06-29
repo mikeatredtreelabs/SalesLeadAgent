@@ -126,6 +126,7 @@ model Opportunity {
   category   String?
   elaboration String? @db.Text
   demoPlan    String? @db.Text
+  demoArtifact String? @db.Text
   createdAt  DateTime @default(now())
   lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
 }

@@ -66,6 +66,17 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
     return seed;
   });
   const [demoPlansOpen, setDemoPlansOpen] = useState<Record<string, boolean>>({});
+  const [demoArtifactLoading, setDemoArtifactLoading] = useState<Record<string, boolean>>({});
+  const [demoArtifacts, setDemoArtifacts] = useState<Record<string, any>>(() => {
+    const seed: Record<string, any> = {};
+    (initialLead.opportunities || []).forEach((op: any) => {
+      if (op.demoArtifact) {
+        try { seed[op.id] = typeof op.demoArtifact === 'string' ? JSON.parse(op.demoArtifact) : op.demoArtifact; } catch {}
+      }
+    });
+    return seed;
+  });
+  const [demoArtifactsOpen, setDemoArtifactsOpen] = useState<Record<string, boolean>>({});
 
   async function elaborate(op: any) {
     const id = op.id;
@@ -156,7 +167,33 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
     setDemoPlanLoading(s => ({ ...s, [id]: false }));
   }
 
-  async function updateStatus(status: string) {
+  async function getDemoArtifact(op: any) {
+    const id = op.id;
+    if (demoArtifacts[id]) { setDemoArtifactsOpen(s => ({ ...s, [id]: !s[id] })); return; }
+    if (op.demoArtifact) {
+      try {
+        const parsed = typeof op.demoArtifact === 'string' ? JSON.parse(op.demoArtifact) : op.demoArtifact;
+        setDemoArtifacts(s => ({ ...s, [id]: parsed }));
+        setDemoArtifactsOpen(s => ({ ...s, [id]: true }));
+        return;
+      } catch {}
+    }
+    setDemoArtifactLoading(s => ({ ...s, [id]: true }));
+    setDemoArtifactsOpen(s => ({ ...s, [id]: true }));
+    try {
+      const res = await fetch('/api/demo-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opportunity: op, demoPlan: demoPlans[id], companyName: lead.companyName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setDemoArtifacts(s => ({ ...s, [id]: data.artifact }));
+    } catch (e: any) {
+      setDemoArtifacts(s => ({ ...s, [id]: { error: e.message } }));
+    }
+    setDemoArtifactLoading(s => ({ ...s, [id]: false }));
+  }
     await fetch(`/api/leads/${lead.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -448,7 +485,7 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
                                       ))}
                                     </ul>
                                   </div>
-                                  {/* Deliverable + time */}
+                                  {/* Deliverable + time + Build Demo button */}
                                   {(demoPlans[op.id].demoDeliverable || demoPlans[op.id].timeToDemo) && (
                                     <div className="col-span-2 flex gap-3 pt-2 border-t border-slate-200">
                                       {demoPlans[op.id].demoDeliverable && (
@@ -463,6 +500,167 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
                                           <div>
                                             <p className="text-xs font-semibold text-slate-600">Time to demo</p>
                                             <p className="text-xs text-slate-700">{demoPlans[op.id].timeToDemo}</p>
+                                          </div>
+                                        </div>
+                                      )}
+                                      <button
+                                        onClick={() => getDemoArtifact(op)}
+                                        disabled={demoArtifactLoading[op.id]}
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-300 bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-all disabled:opacity-50 whitespace-nowrap self-center">
+                                        {demoArtifactLoading[op.id]
+                                          ? <><Loader2 size={11} className="animate-spin" />Building demo...</>
+                                          : demoArtifactsOpen[op.id]
+                                            ? <><ChevronUp size={11} />Hide demo</>
+                                            : <><Sparkles size={11} />Build demo with fake data</>}
+                                      </button>
+                                    </div>
+                                  )}
+                                  {/* Demo artifact viewer */}
+                                  {demoArtifactsOpen[op.id] && (
+                                    <div className="col-span-2 mt-2 border-t border-slate-200 pt-4">
+                                      {demoArtifactLoading[op.id] ? (
+                                        <div className="flex items-center gap-2 text-xs text-slate-500 py-4">
+                                          <Loader2 size={12} className="animate-spin text-emerald-500" />
+                                          Generating synthetic demo data — this may take 15-20 seconds...
+                                        </div>
+                                      ) : demoArtifacts[op.id]?.error ? (
+                                        <p className="text-xs text-red-500">{demoArtifacts[op.id].error}</p>
+                                      ) : demoArtifacts[op.id] && (
+                                        <div className="space-y-4">
+                                          {/* Header */}
+                                          <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <Sparkles size={13} className="text-emerald-600" />
+                                              <h4 className="text-sm font-semibold text-slate-800">{demoArtifacts[op.id].title}</h4>
+                                            </div>
+                                            <p className="text-xs text-slate-500">{demoArtifacts[op.id].description}</p>
+                                          </div>
+
+                                          {/* Insights */}
+                                          {demoArtifacts[op.id].insights?.length > 0 && (
+                                            <div>
+                                              <p className="text-xs font-semibold text-slate-600 mb-2">Key insights</p>
+                                              <div className="grid grid-cols-2 gap-2">
+                                                {demoArtifacts[op.id].insights.map((ins: any, i: number) => {
+                                                  const colors: Record<string, string> = {
+                                                    positive: 'bg-emerald-50 border-emerald-200',
+                                                    negative: 'bg-red-50 border-red-200',
+                                                    warning: 'bg-amber-50 border-amber-200',
+                                                    neutral: 'bg-slate-50 border-slate-200',
+                                                  };
+                                                  const valColors: Record<string, string> = {
+                                                    positive: 'text-emerald-700',
+                                                    negative: 'text-red-600',
+                                                    warning: 'text-amber-700',
+                                                    neutral: 'text-slate-700',
+                                                  };
+                                                  return (
+                                                    <div key={i} className={`rounded-lg border p-2.5 ${colors[ins.type] || colors.neutral}`}>
+                                                      <p className="text-xs text-slate-500 mb-0.5">{ins.title}</p>
+                                                      <p className={`text-sm font-bold ${valColors[ins.type] || valColors.neutral}`}>{ins.value}</p>
+                                                      <p className="text-xs text-slate-500 mt-0.5">{ins.description}</p>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Chart */}
+                                          {demoArtifacts[op.id].chartData && (
+                                            <div>
+                                              <p className="text-xs font-semibold text-slate-600 mb-2">{demoArtifacts[op.id].chartData.title}</p>
+                                              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                                {demoArtifacts[op.id].chartData.datasets?.map((ds: any, di: number) => (
+                                                  <div key={di} className="mb-3">
+                                                    <p className="text-xs text-slate-500 mb-1.5 font-medium">{ds.name}</p>
+                                                    <div className="flex items-end gap-1 h-16">
+                                                      {ds.values?.map((val: number, vi: number) => {
+                                                        const max = Math.max(...(ds.values || [1]));
+                                                        const height = Math.max(4, (val / max) * 56);
+                                                        const barColors: Record<string, string> = { blue: 'bg-blue-400 hover:bg-blue-500', red: 'bg-red-400 hover:bg-red-500', green: 'bg-emerald-400 hover:bg-emerald-500', amber: 'bg-amber-400 hover:bg-amber-500' };
+                                                        return (
+                                                          <div key={vi} className="flex-1 flex flex-col items-center gap-0.5 group">
+                                                            <span className="text-[9px] text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">{val}</span>
+                                                            <div className={`w-full rounded-t transition-colors ${barColors[ds.color] || barColors.blue}`} style={{ height }} />
+                                                          </div>
+                                                        );
+                                                      })}
+                                                    </div>
+                                                    <div className="flex gap-1 mt-1 overflow-hidden">
+                                                      {demoArtifacts[op.id].chartData.labels?.map((lbl: string, li: number) => (
+                                                        <div key={li} className="flex-1 text-center">
+                                                          <span className="text-[9px] text-slate-400 truncate block">{lbl}</span>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Sample data table */}
+                                          {demoArtifacts[op.id].datasets?.[0] && (
+                                            <div>
+                                              <p className="text-xs font-semibold text-slate-600 mb-2">
+                                                Sample data — {demoArtifacts[op.id].datasets[0].name}
+                                                <span className="ml-1 text-slate-400 font-normal">(synthetic)</span>
+                                              </p>
+                                              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                                                <table className="w-full text-xs">
+                                                  <thead>
+                                                    <tr className="bg-slate-50 border-b border-slate-200">
+                                                      {demoArtifacts[op.id].datasets[0].columns?.map((col: string, ci: number) => (
+                                                        <th key={ci} className="text-left px-3 py-2 text-slate-500 font-semibold whitespace-nowrap">{col}</th>
+                                                      ))}
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody className="divide-y divide-slate-100">
+                                                    {demoArtifacts[op.id].datasets[0].rows?.slice(0, 8).map((row: any[], ri: number) => (
+                                                      <tr key={ri} className="hover:bg-slate-50 transition-colors">
+                                                        {row.map((cell, ci) => (
+                                                          <td key={ci} className="px-3 py-1.5 text-slate-600 whitespace-nowrap">{cell}</td>
+                                                        ))}
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                                {demoArtifacts[op.id].datasets[0].rows?.length > 8 && (
+                                                  <p className="text-xs text-slate-400 px-3 py-2 bg-slate-50 border-t border-slate-100">
+                                                    Showing 8 of {demoArtifacts[op.id].datasets[0].rows.length} rows
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Key findings + next steps */}
+                                          <div className="grid grid-cols-2 gap-4">
+                                            {demoArtifacts[op.id].keyFindings?.length > 0 && (
+                                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                                                <p className="text-xs font-semibold text-blue-700 mb-2">Key findings</p>
+                                                <ul className="space-y-1">
+                                                  {demoArtifacts[op.id].keyFindings.map((f: string, i: number) => (
+                                                    <li key={i} className="flex items-start gap-2 text-xs text-blue-800">
+                                                      <span className="text-blue-400 mt-0.5 flex-shrink-0">•</span>{f}
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            )}
+                                            {demoArtifacts[op.id].nextSteps?.length > 0 && (
+                                              <div className="bg-violet-50 border border-violet-100 rounded-lg p-3">
+                                                <p className="text-xs font-semibold text-violet-700 mb-2">Recommended next steps</p>
+                                                <ul className="space-y-1">
+                                                  {demoArtifacts[op.id].nextSteps.map((s: string, i: number) => (
+                                                    <li key={i} className="flex items-start gap-2 text-xs text-violet-800">
+                                                      <span className="w-4 h-4 rounded-full bg-violet-200 text-violet-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i+1}</span>{s}
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       )}
