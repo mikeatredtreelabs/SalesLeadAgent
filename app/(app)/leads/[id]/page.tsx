@@ -5,13 +5,14 @@ import { prisma } from '@/lib/prisma';
 import { redirect, notFound } from 'next/navigation';
 import LeadDetailClient from './LeadDetailClient';
 
-export default async function LeadDetailPage({ params }: { params: { id: string } }) {
+export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
   const userId = (session.user as any).id;
+  const { id } = await params;
 
   const lead = await prisma.lead.findFirst({
-    where: { id: params.id, userId },
+    where: { id, userId },
     include: {
       contacts: true,
       research: { orderBy: { createdAt: 'desc' }, take: 1 },

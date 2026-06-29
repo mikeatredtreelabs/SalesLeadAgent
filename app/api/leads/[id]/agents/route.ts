@@ -4,12 +4,12 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { runAgent } from '@/lib/ai';
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const userId = (session.user as any).id;
   const { agent, input } = await req.json();
-  const leadId = params.id;
+  const { id: leadId } = await params;
 
   const lead = await prisma.lead.findFirst({
     where: { id: leadId, userId },
