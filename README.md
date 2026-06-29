@@ -22,7 +22,7 @@ An agentic lead research and outreach tool for AI consultants. Finds, researches
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/leadagent.git
+git clone https://github.com/mikeatreelabs/leadagent.git
 cd leadagent
 npm install
 ```
@@ -92,3 +92,18 @@ Each step button-triggered. Each result stored in the database. Every action log
 | `NEXTAUTH_URL` | ✓ | Your app URL (http://localhost:3000 locally) |
 | `ANTHROPIC_API_KEY` | ✓ | From console.anthropic.com |
 | `APOLLO_API_KEY` | optional | For lead discovery |
+
+## Push to GitHub
+
+The repo is already initialized with git history. Just run:
+
+```bash
+# 1. Create the repo at github.com/new
+#    Name: leadagent | Private or Public | NO readme, NO .gitignore
+
+# 2. Add remote and push
+git remote add origin https://github.com/mikeatreelabs/leadagent.git
+git push -u origin main
+```
+
+That's it. Vercel will auto-detect the Next.js app on first deploy.
