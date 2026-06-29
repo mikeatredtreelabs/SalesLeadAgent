@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Brain, Users, Mail, CheckCircle2, TrendingUp, Clock, Star, ChevronRight, Building2, Zap, ArrowUpRight } from 'lucide-react';
+import { Brain, Users, Mail, CheckCircle2, TrendingUp, Clock, Star, ChevronRight, Building2, ArrowUpRight } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -33,18 +33,9 @@ export default async function Dashboard() {
   const topLeads = [...leads].filter(l => l.score).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 6);
   const recent = leads.slice(0, 5);
 
-  const stats = [
-    { label: 'Total leads', value: total, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', href: '/leads' },
-    { label: 'Avg score', value: avgScore ? `${avgScore}` : '—', suffix: avgScore ? '/100' : '', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', href: null },
-    { label: 'Outreach ready', value: qualified, icon: Mail, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', href: '/leads?status=Outreach+Ready' },
-    { label: 'Meetings booked', value: meetings, icon: CheckCircle2, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100', href: '/leads?status=Meeting+Scheduled' },
-    { label: 'Won', value: won, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100', href: '/leads?status=Won' },
-    { label: 'Follow-up needed', value: followUp, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', href: '/followups' },
-  ];
-
-  // Pipeline breakdown
-  const pipelineStages = ['New','Researching','Qualified','Outreach Ready','Contacted','Meeting Scheduled','Won'];
+  const pipelineStages = ['New', 'Researching', 'Qualified', 'Outreach Ready', 'Contacted', 'Meeting Scheduled', 'Won'];
   const pipelineData = pipelineStages.map(s => ({ stage: s, count: leads.filter(l => l.status === s).length }));
+  const maxCount = Math.max(...pipelineData.map(d => d.count), 1);
 
   return (
     <div>
@@ -55,57 +46,83 @@ export default async function Dashboard() {
           <p className="text-sm text-slate-500 mt-1">Welcome back, {session.user?.name || session.user?.email?.split('@')[0]}</p>
         </div>
         <Link href="/leads/new"
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+          className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
           + Add lead
         </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-6 gap-4 mb-8">
-        {stats.map(s => {
-          const inner = (
-            <>
-              <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center mb-3`}>
-                <s.icon size={15} className={s.color} />
-              </div>
-              <div className={`text-2xl font-bold ${s.color} leading-none mb-1`}>
-                {s.value}{(s as any).suffix && <span className="text-sm font-normal text-slate-400">{(s as any).suffix}</span>}
-              </div>
-              <p className="text-xs text-slate-500">{s.label}</p>
-            </>
-          );
-          return s.href ? (
-            <Link key={s.label} href={s.href}
-              className={`bg-white border ${s.border} rounded-xl p-4 hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer`}>
-              {inner}
-            </Link>
-          ) : (
-            <div key={s.label} className={`bg-white border ${s.border} rounded-xl p-4`}>
-              {inner}
-            </div>
-          );
-        })}
+      {/* Stats grid */}
+      <div className="grid grid-cols-6 gap-4 mb-6">
+        {/* Total leads */}
+        <Link href="/leads" className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-red-200 hover:-translate-y-0.5 transition-all cursor-pointer group">
+          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center mb-3">
+            <Users size={15} className="text-red-600" />
+          </div>
+          <div className="text-2xl font-bold text-red-600 leading-none mb-1">{total}</div>
+          <p className="text-xs text-slate-500">Total leads</p>
+        </Link>
+        {/* Avg score */}
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center mb-3">
+            <Star size={15} className="text-amber-600" />
+          </div>
+          <div className="text-2xl font-bold text-amber-600 leading-none mb-1">
+            {avgScore ?? '—'}{avgScore && <span className="text-sm font-normal text-slate-400">/100</span>}
+          </div>
+          <p className="text-xs text-slate-500">Avg score</p>
+        </div>
+        {/* Outreach ready */}
+        <Link href="/leads?status=Outreach+Ready" className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-emerald-200 hover:-translate-y-0.5 transition-all cursor-pointer">
+          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center mb-3">
+            <Mail size={15} className="text-emerald-600" />
+          </div>
+          <div className="text-2xl font-bold text-emerald-600 leading-none mb-1">{qualified}</div>
+          <p className="text-xs text-slate-500">Outreach ready</p>
+        </Link>
+        {/* Meetings */}
+        <Link href="/leads?status=Meeting+Scheduled" className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-violet-200 hover:-translate-y-0.5 transition-all cursor-pointer">
+          <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center mb-3">
+            <CheckCircle2 size={15} className="text-violet-600" />
+          </div>
+          <div className="text-2xl font-bold text-violet-600 leading-none mb-1">{meetings}</div>
+          <p className="text-xs text-slate-500">Meetings booked</p>
+        </Link>
+        {/* Won */}
+        <Link href="/leads?status=Won" className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-green-200 hover:-translate-y-0.5 transition-all cursor-pointer">
+          <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center mb-3">
+            <TrendingUp size={15} className="text-green-600" />
+          </div>
+          <div className="text-2xl font-bold text-green-600 leading-none mb-1">{won}</div>
+          <p className="text-xs text-slate-500">Won</p>
+        </Link>
+        {/* Follow-up */}
+        <Link href="/followups" className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-orange-200 hover:-translate-y-0.5 transition-all cursor-pointer">
+          <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center mb-3">
+            <Clock size={15} className="text-orange-600" />
+          </div>
+          <div className="text-2xl font-bold text-orange-600 leading-none mb-1">{followUp}</div>
+          <p className="text-xs text-slate-500">Follow-up needed</p>
+        </Link>
       </div>
 
-      {/* Pipeline bar */}
+      {/* Pipeline bar chart */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6">
         <h2 className="text-sm font-semibold text-slate-700 mb-4">Pipeline stages</h2>
-        <div className="flex items-end gap-1 h-16">
+        <div className="flex items-end gap-2 h-16">
           {pipelineData.map(({ stage, count }) => {
-            const max = Math.max(...pipelineData.map(d => d.count), 1);
-            const height = count === 0 ? 4 : Math.max(12, (count / max) * 56);
+            const height = count === 0 ? 4 : Math.max(10, (count / maxCount) * 56);
             return (
               <div key={stage} className="flex-1 flex flex-col items-center gap-1 group">
-                <span className="text-xs text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity font-medium">{count}</span>
-                <div className="w-full bg-blue-100 rounded-t-sm group-hover:bg-blue-500 transition-colors" style={{ height }} />
+                <span className="text-xs text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">{count}</span>
+                <div className="w-full bg-red-100 hover:bg-red-500 rounded-t transition-colors cursor-default" style={{ height }} />
               </div>
             );
           })}
         </div>
-        <div className="flex gap-1 mt-2">
+        <div className="flex gap-2 mt-2">
           {pipelineData.map(({ stage }) => (
             <div key={stage} className="flex-1 text-center">
-              <span className="text-[10px] text-slate-400 leading-none">{stage.replace(' ', '\n')}</span>
+              <span className="text-[10px] text-slate-400 leading-tight block">{stage}</span>
             </div>
           ))}
         </div>
@@ -113,47 +130,46 @@ export default async function Dashboard() {
 
       {/* Two column: top leads + recent activity */}
       <div className="grid grid-cols-5 gap-6">
-        {/* Top scored leads — 3 cols */}
+        {/* Top scored leads */}
         <div className="col-span-3">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-slate-700">Top scored leads</h2>
-            <Link href="/leads" className="text-xs text-blue-600 hover:underline flex items-center gap-1">View all <ArrowUpRight size={11} /></Link>
+            <Link href="/leads" className="text-xs text-red-600 hover:underline flex items-center gap-1">
+              View all <ArrowUpRight size={11} />
+            </Link>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             {topLeads.length === 0 ? (
-              <div className="py-10 text-center text-sm text-slate-400">No scored leads yet — research a lead to generate a score</div>
+              <div className="py-10 text-center text-sm text-slate-400">
+                No scored leads yet — open a lead and run the Score agent
+              </div>
             ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Company</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Industry</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Score</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Status</th>
-                    <th className="px-4" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {topLeads.map((l, i) => (
-                    <tr key={l.id} className={`hover:bg-slate-50 transition-colors ${i < topLeads.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                      <td className="px-4 py-3">
-                        <Link href={`/leads/${l.id}`} className="text-sm font-medium text-slate-800 hover:text-blue-700 transition-colors">{l.companyName}</Link>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{l.industry || '—'}</td>
-                      <td className="px-4 py-3"><ScoreBadge score={l.score} /></td>
-                      <td className="px-4 py-3"><StatusBadge status={l.status} /></td>
-                      <td className="px-4 py-3">
-                        <Link href={`/leads/${l.id}`}><ChevronRight size={14} className="text-slate-300 hover:text-blue-500" /></Link>
-                      </td>
-                    </tr>
+              <div>
+                <div className="grid grid-cols-[2fr_1.5fr_auto_auto_auto] gap-4 px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                  {['Company', 'Industry', 'Score', 'Status', ''].map((h, i) => (
+                    <div key={i} className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {topLeads.map(l => (
+                    <Link key={l.id} href={`/leads/${l.id}`}
+                      className="grid grid-cols-[2fr_1.5fr_auto_auto_auto] gap-4 px-4 py-3 items-center hover:bg-slate-50 transition-colors group">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800 group-hover:text-red-700 transition-colors">{l.companyName}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 truncate">{l.industry || '—'}</p>
+                      <ScoreBadge score={l.score} />
+                      <StatusBadge status={l.status} />
+                      <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Recent activity — 2 cols */}
+        {/* Recent activity */}
         <div className="col-span-2">
           <h2 className="text-sm font-semibold text-slate-700 mb-3">Recent activity</h2>
           <div className="space-y-2">
@@ -162,17 +178,19 @@ export default async function Dashboard() {
             )}
             {recent.map(l => (
               <Link key={l.id} href={`/leads/${l.id}`}
-                className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3 hover:border-blue-300 hover:bg-blue-50/30 transition-all group">
-                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  {l.research.length > 0 ? <Brain size={14} className="text-blue-500" /> : <Building2 size={14} className="text-slate-400" />}
+                className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3 hover:border-red-200 hover:bg-red-50/30 transition-all group">
+                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-red-100 transition-colors">
+                  {l.research.length > 0
+                    ? <Brain size={14} className="text-red-500" />
+                    : <Building2 size={14} className="text-slate-400 group-hover:text-red-500 transition-colors" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate group-hover:text-blue-700 transition-colors">{l.companyName}</p>
-                  <p className="text-xs text-slate-400">
-                    {l.activities[0] ? l.activities[0].action : 'Added · ' + new Date(l.createdAt).toLocaleDateString()}
+                  <p className="text-sm font-medium text-slate-800 truncate group-hover:text-red-700 transition-colors">{l.companyName}</p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {l.activities[0]?.action || 'Added · ' + new Date(l.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />
+                <ChevronRight size={14} className="text-slate-300 flex-shrink-0 group-hover:text-red-500 transition-colors" />
               </Link>
             ))}
           </div>
