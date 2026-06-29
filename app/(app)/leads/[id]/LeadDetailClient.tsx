@@ -47,7 +47,14 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
   const [researchInput, setResearchInput] = useState(initialLead.notes || '');
   const [error, setError] = useState<string | null>(null);
   const [elaborating, setElaborating] = useState<Record<string, boolean>>({});
-  const [elaborations, setElaborations] = useState<Record<string, string>>({});
+  // Pre-seed from any already-saved elaborations in the DB
+  const [elaborations, setElaborations] = useState<Record<string, string>>(() => {
+    const seed: Record<string, string> = {};
+    (initialLead.opportunities || []).forEach((op: any) => {
+      if (op.elaboration) seed[op.id] = op.elaboration;
+    });
+    return seed;
+  });
   const [elaborationsOpen, setElaborationsOpen] = useState<Record<string, boolean>>({});
 
   async function elaborate(op: any) {

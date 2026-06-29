@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { runAgent } from '@/lib/ai';
 
 export async function POST(req: NextRequest) {
@@ -8,6 +9,11 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { opportunity, companyName } = await req.json();
+
+  // Return cached version if already saved
+  if (opportunity.elaboration) {
+    return NextResponse.json({ explanation: opportunity.elaboration });
+  }
 
   try {
     const result = await runAgent(
@@ -30,6 +36,13 @@ Write exactly 4 short paragraphs:
 Return ONLY a JSON object: { "explanation": "your full explanation here with paragraphs separated by double newlines" }`,
       800
     );
+
+    // Save to DB so it never needs to be regenerated
+    await prisma.opportunity.update({
+      where: { id: opportunity.id },
+      data: { elaboration: result.explanation },
+    });
+
     return NextResponse.json({ explanation: result.explanation });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
