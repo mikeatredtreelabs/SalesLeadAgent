@@ -2,11 +2,78 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Brain, Star, Lightbulb, Mail, ClipboardList, Activity, Building2, Globe, Users, FileText, Zap, Loader2, CheckCircle2, AlertCircle, Copy, Check, Sparkles, Clock, MessageSquare, X } from 'lucide-react';
+import { ArrowLeft, Brain, Star, Lightbulb, Mail, ClipboardList, Activity, Building2, Globe, Users, FileText, Zap, Loader2, CheckCircle2, AlertCircle, Copy, Check, Sparkles, Clock, MessageSquare, X, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import StatusBadge, { STATUS_COLORS } from '@/components/StatusBadge';
 import ScoreBadge from '@/components/ScoreBadge';
 
 const ALL_STATUSES = Object.keys(STATUS_COLORS);
+
+function ElaborateButton({ opportunity, companyName }: { opportunity: any; companyName: string }) {
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [explanation, setExplanation] = useState('');
+
+  async function elaborate() {
+    if (explanation) { setExpanded(e => !e); return; }
+    setLoading(true);
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 600,
+          messages: [{
+            role: 'user',
+            content: `I'm an AI consultant evaluating an opportunity for ${companyName}. Explain this opportunity in plain English so I fully understand what we'd actually be building and doing for this client.
+
+Opportunity: ${opportunity.title}
+Problem: ${opportunity.problem}
+Solution: ${opportunity.solution}
+Business value: ${opportunity.value}
+
+Write 3-4 short paragraphs:
+1. What the current painful situation looks like day-to-day for this company (no jargon)
+2. Exactly what we would build or set up — in plain terms a non-technical person would understand
+3. What changes for their team once it's in place — what they stop doing manually
+4. Why this is a good fit for an AI consulting engagement (scope, timeline, ROI)
+
+Be concrete and specific to ${companyName}. No bullet points. Plain conversational English.`
+          }]
+        })
+      });
+      const data = await res.json();
+      const text = data.content?.find((b: any) => b.type === 'text')?.text || '';
+      setExplanation(text);
+      setExpanded(true);
+    } catch {
+      setExplanation('Could not generate explanation. Please try again.');
+      setExpanded(true);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div>
+      <button onClick={elaborate} disabled={loading}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-all disabled:opacity-50">
+        {loading
+          ? <Loader2 size={11} className="animate-spin" />
+          : expanded ? <ChevronUp size={11} /> : <BookOpen size={11} />}
+        {loading ? 'Explaining...' : expanded ? 'Hide' : 'Elaborate'}
+      </button>
+      {expanded && explanation && (
+        <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3.5">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Sparkles size={12} className="text-blue-500" />
+            <span className="text-xs font-semibold text-slate-600">Plain English explanation</span>
+          </div>
+          <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{explanation}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AgentBtn({ label, icon: Icon, onClick, loading, done, disabled }: any) {
   return (
@@ -254,7 +321,10 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
                 <div key={op.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-200 transition-colors">
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="text-sm font-semibold text-slate-800 leading-snug flex-1">{op.title}</h3>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ml-2 flex-shrink-0 ${diffColor[op.difficulty] || diffColor[3]}`}>{diffLabel[op.difficulty] || 'Moderate'}</span>
+                    <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${diffColor[op.difficulty] || diffColor[3]}`}>{diffLabel[op.difficulty] || 'Moderate'}</span>
+                      <ElaborateButton opportunity={op} companyName={lead.companyName} />
+                    </div>
                   </div>
                   <p className="text-xs text-slate-500 mb-2 leading-relaxed">{op.problem}</p>
                   <div className="bg-blue-50 rounded-lg p-2.5 mb-2"><p className="text-xs font-medium text-blue-700 mb-0.5">Solution</p><p className="text-xs text-blue-800">{op.solution}</p></div>
