@@ -40,6 +40,7 @@ SalesLeadAgent/
 │   │   │       ├── page.tsx            # Server component — fetches lead data
 │   │   │       └── LeadDetailClient.tsx # Client component — agent buttons + tabs
 │   │   ├── discover/page.tsx   # Apollo.io lead discovery
+│   │   ├── competitors/page.tsx # Competitor finder — enter a website, get competitors with checkbox import
 │   │   ├── followups/page.tsx  # Pending follow-up tasks
 │   │   └── settings/
 │   │       ├── page.tsx        # Settings (server)
@@ -55,6 +56,7 @@ SalesLeadAgent/
 │       │   └── [id]/
 │       │       ├── route.ts                # GET, PATCH, DELETE single lead
 │       │       └── agents/route.ts         # All 5 AI agents (POST with agent name)
+│       ├── competitors/route.ts            # AI competitor discovery from a website URL
 │       └── discover/route.ts               # Apollo.io search proxy
 ├── components/
 │   ├── Sidebar.tsx             # Navigation sidebar with pipeline indicator

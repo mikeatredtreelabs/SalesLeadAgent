@@ -1,13 +1,14 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Brain, LayoutDashboard, Building2, Plus, Search, ListTodo, Settings, ChevronRight, Zap } from 'lucide-react';
+import { Brain, LayoutDashboard, Building2, Plus, Search, ListTodo, Settings, ChevronRight, Zap, Swords } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 const nav = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: Building2 },
   { href: '/discover', label: 'Discover', icon: Search },
+  { href: '/competitors', label: 'Competitors', icon: Swords },
   { href: '/followups', label: 'Follow-ups', icon: ListTodo },
 ];
 
