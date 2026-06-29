@@ -56,6 +56,17 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
     return seed;
   });
   const [elaborationsOpen, setElaborationsOpen] = useState<Record<string, boolean>>({});
+  const [demoPlanLoading, setDemoPlanLoading] = useState<Record<string, boolean>>({});
+  const [demoPlans, setDemoPlans] = useState<Record<string, any>>(() => {
+    const seed: Record<string, any> = {};
+    (initialLead.opportunities || []).forEach((op: any) => {
+      if (op.demoPlan) {
+        try { seed[op.id] = typeof op.demoPlan === 'string' ? JSON.parse(op.demoPlan) : op.demoPlan; } catch {}
+      }
+    });
+    return seed;
+  });
+  const [demoPlansOpen, setDemoPlansOpen] = useState<Record<string, boolean>>({});
 
   async function elaborate(op: any) {
     const id = op.id;
@@ -100,7 +111,24 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
     setRunning(r => ({ ...r, [agentName]: false }));
   }
 
-  async function updateStatus(status: string) {
+  async function getDemoPlan(op: any) {
+    const id = op.id;
+    if (demoPlans[id]) { setDemoPlansOpen(s => ({ ...s, [id]: !s[id] })); return; }
+    setDemoPlanLoading(s => ({ ...s, [id]: true }));
+    setDemoPlansOpen(s => ({ ...s, [id]: true }));
+    try {
+      const res = await fetch('/api/demo-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opportunity: op, companyName: lead.companyName }),
+      });
+      const data = await res.json();
+      setDemoPlans(s => ({ ...s, [id]: data.demoPlan }));
+    } catch {
+      setDemoPlans(s => ({ ...s, [id]: { error: 'Could not generate demo plan. Please try again.' } }));
+    }
+    setDemoPlanLoading(s => ({ ...s, [id]: false }));
+  }
     await fetch(`/api/leads/${lead.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -326,15 +354,96 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-center gap-1.5 mb-2.5">
-                            <Sparkles size={12} className="text-blue-500" />
-                            <span className="text-xs font-semibold text-slate-600">Plain English explanation</span>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <div className="flex items-center gap-1.5">
+                              <Sparkles size={12} className="text-blue-500" />
+                              <span className="text-xs font-semibold text-slate-600">Plain English explanation</span>
+                            </div>
+                            <button
+                              onClick={() => getDemoPlan(op)}
+                              disabled={demoPlanLoading[op.id]}
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-violet-200 bg-violet-50 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-all disabled:opacity-50 whitespace-nowrap">
+                              {demoPlanLoading[op.id]
+                                ? <Loader2 size={11} className="animate-spin" />
+                                : demoPlansOpen[op.id] ? <ChevronUp size={11} /> : <Zap size={11} />}
+                              {demoPlanLoading[op.id] ? 'Building...' : demoPlansOpen[op.id] ? 'Hide demo plan' : 'Demo plan'}
+                            </button>
                           </div>
                           <div className="space-y-2.5">
                             {(elaborations[op.id] || '').split('\n\n').filter(Boolean).map((para, i) => (
                               <p key={i} className="text-xs text-slate-700 leading-relaxed">{para}</p>
                             ))}
                           </div>
+                          {/* Demo plan panel */}
+                          {demoPlansOpen[op.id] && (
+                            <div className="mt-4 border-t border-slate-200 pt-4">
+                              {demoPlanLoading[op.id] ? (
+                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                  <Loader2 size={12} className="animate-spin text-violet-500" />
+                                  Building demo plan...
+                                </div>
+                              ) : demoPlans[op.id]?.error ? (
+                                <p className="text-xs text-red-500">{demoPlans[op.id].error}</p>
+                              ) : demoPlans[op.id] && (
+                                <div className="grid grid-cols-2 gap-4">
+                                  {/* What we need from client */}
+                                  <div>
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                      <div className="w-4 h-4 rounded bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                        <FileText size={10} className="text-amber-600" />
+                                      </div>
+                                      <p className="text-xs font-semibold text-slate-700">What we need from them</p>
+                                    </div>
+                                    <ul className="space-y-1.5">
+                                      {(demoPlans[op.id].whatWeNeedFromClient || []).map((item: string, i: number) => (
+                                        <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
+                                          <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                                          {item}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                  {/* What we will do */}
+                                  <div>
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                      <div className="w-4 h-4 rounded bg-violet-100 flex items-center justify-center flex-shrink-0">
+                                        <Zap size={10} className="text-violet-600" />
+                                      </div>
+                                      <p className="text-xs font-semibold text-slate-700">What we will do</p>
+                                    </div>
+                                    <ul className="space-y-1.5">
+                                      {(demoPlans[op.id].whatWeWillDo || []).map((item: string, i: number) => (
+                                        <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
+                                          <span className="w-4 h-4 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                                          {item}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                  {/* Deliverable + time */}
+                                  {(demoPlans[op.id].demoDeliverable || demoPlans[op.id].timeToDemo) && (
+                                    <div className="col-span-2 flex gap-3 pt-2 border-t border-slate-200">
+                                      {demoPlans[op.id].demoDeliverable && (
+                                        <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5">
+                                          <p className="text-xs font-semibold text-emerald-700 mb-0.5">What they'll see</p>
+                                          <p className="text-xs text-emerald-800">{demoPlans[op.id].demoDeliverable}</p>
+                                        </div>
+                                      )}
+                                      {demoPlans[op.id].timeToDemo && (
+                                        <div className="bg-slate-100 border border-slate-200 rounded-lg p-2.5 flex items-center gap-2">
+                                          <Clock size={12} className="text-slate-500 flex-shrink-0" />
+                                          <div>
+                                            <p className="text-xs font-semibold text-slate-600">Time to demo</p>
+                                            <p className="text-xs text-slate-700">{demoPlans[op.id].timeToDemo}</p>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
