@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/seed.ts",
+    "seed": "node scripts/seed.js",
     "db:push": "prisma db push",
     "db:studio": "prisma studio"
   },
