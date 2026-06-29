@@ -34,24 +34,28 @@ function ElaborateButton({ opportunity, companyName }: { opportunity: any; compa
   }
 
   return (
-    <div>
+    <>
       <button onClick={elaborate} disabled={loading}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-all disabled:opacity-50">
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-all disabled:opacity-50 whitespace-nowrap">
         {loading
           ? <Loader2 size={11} className="animate-spin" />
           : expanded ? <ChevronUp size={11} /> : <BookOpen size={11} />}
         {loading ? 'Explaining...' : expanded ? 'Hide' : 'Elaborate'}
       </button>
       {expanded && explanation && (
-        <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3.5">
-          <div className="flex items-center gap-1.5 mb-2">
+        <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-4">
+          <div className="flex items-center gap-1.5 mb-2.5">
             <Sparkles size={12} className="text-blue-500" />
             <span className="text-xs font-semibold text-slate-600">Plain English explanation</span>
           </div>
-          <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{explanation}</p>
+          <div className="space-y-2">
+            {explanation.split('\n\n').filter(Boolean).map((para, i) => (
+              <p key={i} className="text-xs text-slate-700 leading-relaxed">{para}</p>
+            ))}
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -296,7 +300,7 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               {lead.opportunities.map((op: any) => (
                 <div key={op.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-200 transition-colors">
                   <div className="flex items-start justify-between mb-2">
@@ -306,10 +310,14 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
                       <ElaborateButton opportunity={op} companyName={lead.companyName} />
                     </div>
                   </div>
-                  <p className="text-xs text-slate-500 mb-2 leading-relaxed">{op.problem}</p>
-                  <div className="bg-blue-50 rounded-lg p-2.5 mb-2"><p className="text-xs font-medium text-blue-700 mb-0.5">Solution</p><p className="text-xs text-blue-800">{op.solution}</p></div>
-                  <div className="bg-emerald-50 rounded-lg p-2.5 mb-3"><p className="text-xs font-medium text-emerald-700 mb-0.5">Business value</p><p className="text-xs text-emerald-800">{op.value}</p></div>
-                  <div className="flex items-center justify-between text-xs text-slate-500">
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1 leading-relaxed">{op.problem}</p>
+                    </div>
+                    <div className="bg-blue-50 rounded-lg p-2.5"><p className="text-xs font-medium text-blue-700 mb-0.5">Solution</p><p className="text-xs text-blue-800">{op.solution}</p></div>
+                    <div className="bg-emerald-50 rounded-lg p-2.5"><p className="text-xs font-medium text-emerald-700 mb-0.5">Business value</p><p className="text-xs text-emerald-800">{op.value}</p></div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-3">
                     <div className="flex items-center gap-1"><Clock size={11} />{op.timeline}</div>
                     <div className="font-semibold text-slate-700">${Math.round((op.valueLow || 0)/1000)}K–${Math.round((op.valueHigh || 0)/1000)}K</div>
                   </div>
