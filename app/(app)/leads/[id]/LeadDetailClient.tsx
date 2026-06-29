@@ -70,6 +70,7 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
 
   async function elaborate(op: any) {
     const id = op.id;
+    // Toggle if already loaded in state
     if (elaborations[id]) {
       setElaborationsOpen(s => ({ ...s, [id]: !s[id] }));
       return;

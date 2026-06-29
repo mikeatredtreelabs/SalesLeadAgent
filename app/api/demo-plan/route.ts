@@ -10,9 +10,18 @@ export async function POST(req: NextRequest) {
 
   const { opportunity, companyName } = await req.json();
 
-  // Return cached version if already saved
-  if (opportunity.demoPlan) {
-    return NextResponse.json({ demoPlan: opportunity.demoPlan });
+  // Always check DB first
+  const dbOp = await prisma.opportunity.findUnique({
+    where: { id: opportunity.id },
+    select: { demoPlan: true },
+  });
+
+  if (dbOp?.demoPlan) {
+    try {
+      return NextResponse.json({ demoPlan: JSON.parse(dbOp.demoPlan), cached: true });
+    } catch {
+      // If parse fails, regenerate
+    }
   }
 
   try {
@@ -44,17 +53,16 @@ Return exactly this JSON shape:
   "timeToDemo": "estimated time to build the demo (e.g. 3-5 days)"
 }
 
-Be very specific to ${companyName} and their industry. Each item should be a concrete, actionable thing — not vague. Keep each bullet under 15 words.`,
+Be very specific to ${companyName} and their industry. Keep each bullet under 15 words.`,
       1000
     );
 
-    // Save to DB
     await prisma.opportunity.update({
       where: { id: opportunity.id },
       data: { demoPlan: JSON.stringify(result) },
     });
 
-    return NextResponse.json({ demoPlan: result });
+    return NextResponse.json({ demoPlan: result, cached: false });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

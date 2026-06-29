@@ -10,9 +10,14 @@ export async function POST(req: NextRequest) {
 
   const { opportunity, companyName } = await req.json();
 
-  // Return cached version if already saved
-  if (opportunity.elaboration) {
-    return NextResponse.json({ explanation: opportunity.elaboration });
+  // Always check DB first — don't trust client-passed object
+  const dbOp = await prisma.opportunity.findUnique({
+    where: { id: opportunity.id },
+    select: { elaboration: true },
+  });
+
+  if (dbOp?.elaboration) {
+    return NextResponse.json({ explanation: dbOp.elaboration, cached: true });
   }
 
   try {
@@ -37,13 +42,12 @@ Return ONLY a JSON object: { "explanation": "your full explanation here with par
       800
     );
 
-    // Save to DB so it never needs to be regenerated
     await prisma.opportunity.update({
       where: { id: opportunity.id },
       data: { elaboration: result.explanation },
     });
 
-    return NextResponse.json({ explanation: result.explanation });
+    return NextResponse.json({ explanation: result.explanation, cached: false });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
