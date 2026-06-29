@@ -17,34 +17,14 @@ function ElaborateButton({ opportunity, companyName }: { opportunity: any; compa
     if (explanation) { setExpanded(e => !e); return; }
     setLoading(true);
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/elaborate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 600,
-          messages: [{
-            role: 'user',
-            content: `I'm an AI consultant evaluating an opportunity for ${companyName}. Explain this opportunity in plain English so I fully understand what we'd actually be building and doing for this client.
-
-Opportunity: ${opportunity.title}
-Problem: ${opportunity.problem}
-Solution: ${opportunity.solution}
-Business value: ${opportunity.value}
-
-Write 3-4 short paragraphs:
-1. What the current painful situation looks like day-to-day for this company (no jargon)
-2. Exactly what we would build or set up — in plain terms a non-technical person would understand
-3. What changes for their team once it's in place — what they stop doing manually
-4. Why this is a good fit for an AI consulting engagement (scope, timeline, ROI)
-
-Be concrete and specific to ${companyName}. No bullet points. Plain conversational English.`
-          }]
-        })
+        body: JSON.stringify({ opportunity, companyName }),
       });
       const data = await res.json();
-      const text = data.content?.find((b: any) => b.type === 'text')?.text || '';
-      setExplanation(text);
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setExplanation(data.explanation || '');
       setExpanded(true);
     } catch {
       setExplanation('Could not generate explanation. Please try again.');
