@@ -5,8 +5,8 @@
       "name": "Next.js Dev Server",
       "type": "node",
       "request": "launch",
-      "program": "${workspaceFolder}/node_modules/next/dist/bin/next",
-      "args": ["dev"],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
       "cwd": "${workspaceFolder}",
       "env": {
         "NODE_ENV": "development"
