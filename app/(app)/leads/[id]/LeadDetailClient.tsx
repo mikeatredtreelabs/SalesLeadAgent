@@ -47,7 +47,6 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
   const [researchInput, setResearchInput] = useState(initialLead.notes || '');
   const [error, setError] = useState<string | null>(null);
   const [elaborating, setElaborating] = useState<Record<string, boolean>>({});
-  // Pre-seed from any already-saved elaborations in the DB
   const [elaborations, setElaborations] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
     (initialLead.opportunities || []).forEach((op: any) => {
@@ -70,11 +69,18 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
 
   async function elaborate(op: any) {
     const id = op.id;
-    // Toggle if already loaded in state
+    // Already in state — just toggle visibility, no API call
     if (elaborations[id]) {
       setElaborationsOpen(s => ({ ...s, [id]: !s[id] }));
       return;
     }
+    // Check if it's on the op object directly (from DB seed on lead load)
+    if (op.elaboration) {
+      setElaborations(s => ({ ...s, [id]: op.elaboration }));
+      setElaborationsOpen(s => ({ ...s, [id]: true }));
+      return;
+    }
+    // Not cached anywhere — call API to generate and save
     setElaborating(s => ({ ...s, [id]: true }));
     setElaborationsOpen(s => ({ ...s, [id]: true }));
     try {
@@ -114,7 +120,18 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
 
   async function getDemoPlan(op: any) {
     const id = op.id;
+    // Already in state — just toggle
     if (demoPlans[id]) { setDemoPlansOpen(s => ({ ...s, [id]: !s[id] })); return; }
+    // On the op object directly
+    if (op.demoPlan) {
+      try {
+        const parsed = typeof op.demoPlan === 'string' ? JSON.parse(op.demoPlan) : op.demoPlan;
+        setDemoPlans(s => ({ ...s, [id]: parsed }));
+        setDemoPlansOpen(s => ({ ...s, [id]: true }));
+        return;
+      } catch {}
+    }
+    // Generate and save
     setDemoPlanLoading(s => ({ ...s, [id]: true }));
     setDemoPlansOpen(s => ({ ...s, [id]: true }));
     try {
