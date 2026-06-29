@@ -71,16 +71,20 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
     const id = op.id;
     // Already in state — just toggle visibility, no API call
     if (elaborations[id]) {
+      console.log(`[elaborate] Already in state — instant toggle`);
       setElaborationsOpen(s => ({ ...s, [id]: !s[id] }));
       return;
     }
-    // Check if it's on the op object directly (from DB seed on lead load)
+    // On the op object directly (from DB seed on page load)
     if (op.elaboration) {
+      console.log(`[elaborate] Reading from op object (page load seed) — instant`);
       setElaborations(s => ({ ...s, [id]: op.elaboration }));
       setElaborationsOpen(s => ({ ...s, [id]: true }));
       return;
     }
-    // Not cached anywhere — call API to generate and save
+    // Not cached anywhere — call API
+    console.log(`[elaborate] No cache found — hitting API...`);
+    const t0 = performance.now();
     setElaborating(s => ({ ...s, [id]: true }));
     setElaborationsOpen(s => ({ ...s, [id]: true }));
     try {
@@ -89,9 +93,13 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ opportunity: op, companyName: lead.companyName }),
       });
+      const t1 = performance.now();
+      console.log(`[elaborate] API response received in ${Math.round(t1 - t0)}ms`);
       const data = await res.json();
+      console.log(`[elaborate] cached=${data.cached} | explanation length=${data.explanation?.length}`);
       setElaborations(s => ({ ...s, [id]: data.explanation || 'No explanation returned.' }));
-    } catch {
+    } catch (e) {
+      console.error(`[elaborate] Error:`, e);
       setElaborations(s => ({ ...s, [id]: 'Could not generate explanation. Please try again.' }));
     }
     setElaborating(s => ({ ...s, [id]: false }));

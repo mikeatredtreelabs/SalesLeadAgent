@@ -9,18 +9,24 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { opportunity, companyName } = await req.json();
+  const t0 = Date.now();
 
   // Always check DB first — don't trust client-passed object
   const dbOp = await prisma.opportunity.findUnique({
     where: { id: opportunity.id },
     select: { elaboration: true },
   });
+  const t1 = Date.now();
+  console.log(`[elaborate] DB lookup: ${t1 - t0}ms | cached: ${!!dbOp?.elaboration}`);
 
   if (dbOp?.elaboration) {
+    console.log(`[elaborate] Returning cached result (${dbOp.elaboration.length} chars)`);
     return NextResponse.json({ explanation: dbOp.elaboration, cached: true });
   }
 
+  console.log(`[elaborate] No cache found — calling Claude...`);
   try {
+    const t2 = Date.now();
     const result = await runAgent(
       `You are an AI consultant explaining a consulting opportunity in plain English. 
 Write 4 short paragraphs — no bullet points, no headers, no jargon. 
@@ -41,11 +47,15 @@ Write exactly 4 short paragraphs:
 Return ONLY a JSON object: { "explanation": "your full explanation here with paragraphs separated by double newlines" }`,
       800
     );
+    const t3 = Date.now();
+    console.log(`[elaborate] Claude call: ${t3 - t2}ms`);
 
     await prisma.opportunity.update({
       where: { id: opportunity.id },
       data: { elaboration: result.explanation },
     });
+    const t4 = Date.now();
+    console.log(`[elaborate] DB save: ${t4 - t3}ms | total: ${t4 - t0}ms`);
 
     return NextResponse.json({ explanation: result.explanation, cached: false });
   } catch (e: any) {
