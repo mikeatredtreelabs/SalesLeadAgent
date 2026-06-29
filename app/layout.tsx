@@ -5,7 +5,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'LeadAgent — AI Sales Intelligence',
+  title: 'SalesLeadAgent — AI Sales Intelligence',
   description: 'AI-powered lead research and outreach for AI consultants',
 };
 

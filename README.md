@@ -1,4 +1,4 @@
-# LeadAgent — AI Sales Intelligence
+# SalesLeadAgent — AI Sales Intelligence
 
 An agentic lead research and outreach tool for AI consultants. Finds, researches, scores, and helps you close leads using Claude AI agents.
 
@@ -22,8 +22,8 @@ An agentic lead research and outreach tool for AI consultants. Finds, researches
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/mikeatreelabs/leadagent.git
-cd leadagent
+git clone https://github.com/mikeatreelabs/salesleadagent.git
+cd salesleadagent
 npm install
 ```
 
@@ -43,7 +43,7 @@ cp .env.local.example .env.local
 ```bash
 npx prisma db push
 npm run seed
-# Creates: admin@leadagent.io / changeme123
+# Creates: admin@salesleadagent.io / changeme123
 ```
 
 ### 4. Run
@@ -66,7 +66,7 @@ Set all env vars in Vercel dashboard under Settings → Environment Variables.
 
 1. Open the deployed URL in Safari (iOS) or Chrome (Android)
 2. Tap Share → Add to Home Screen (iOS) or Install App (Android)
-3. LeadAgent appears as a native app icon
+3. SalesLeadAgent appears as a native app icon
 
 ## Apollo.io (Lead Discovery)
 
@@ -99,10 +99,10 @@ The repo is already initialized with git history. Just run:
 
 ```bash
 # 1. Create the repo at github.com/new
-#    Name: leadagent | Private or Public | NO readme, NO .gitignore
+#    Name: salesleadagent | Private or Public | NO readme, NO .gitignore
 
 # 2. Add remote and push
-git remote add origin https://github.com/mikeatreelabs/leadagent.git
+git remote add origin https://github.com/mikeatreelabs/salesleadagent.git
 git push -u origin main
 ```
 

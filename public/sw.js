@@ -1,4 +1,4 @@
-const CACHE_NAME = 'leadagent-v1';
+const CACHE_NAME = 'salesleadagent-v1';
 const STATIC_ASSETS = [
   '/',
   '/leads',

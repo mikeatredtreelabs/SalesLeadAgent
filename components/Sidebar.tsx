@@ -26,7 +26,7 @@ export default function Sidebar() {
             <Brain size={16} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-900 leading-none tracking-tight">LeadAgent</p>
+            <p className="text-sm font-bold text-slate-900 leading-none tracking-tight">SalesLeadAgent</p>
             <p className="text-xs text-slate-400 mt-0.5">AI sales intelligence</p>
           </div>
         </div>

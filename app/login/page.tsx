@@ -29,7 +29,7 @@ export default function LoginPage() {
           <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
             <Brain size={18} className="text-white" />
           </div>
-          <span className="text-white font-bold text-lg">LeadAgent</span>
+          <span className="text-white font-bold text-lg">SalesLeadAgent</span>
         </div>
         <div>
           <p className="text-white/60 text-sm mb-4 font-medium uppercase tracking-wider">What it does</p>
@@ -52,7 +52,7 @@ export default function LoginPage() {
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <Brain size={16} className="text-white" />
             </div>
-            <span className="font-bold text-slate-900">LeadAgent</span>
+            <span className="font-bold text-slate-900">SalesLeadAgent</span>
           </div>
           <h1 className="text-2xl font-semibold text-slate-900 mb-1">Sign in</h1>
           <p className="text-sm text-slate-500 mb-7">Access your AI sales pipeline</p>

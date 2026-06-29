@@ -1,6 +1,6 @@
 {
-  "name": "LeadAgent",
-  "short_name": "LeadAgent",
+  "name": "SalesLeadAgent",
+  "short_name": "SalesLeadAgent",
   "description": "AI-powered sales lead intelligence",
   "start_url": "/",
   "display": "standalone",
