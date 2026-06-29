@@ -23,64 +23,61 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await runAgent(
-      `You are an expert data engineer and AI consultant. Generate realistic synthetic demo data and a complete self-contained demo for a prospect meeting.
-Return ONLY valid JSON, no markdown, no preamble. The data must look real and industry-specific.`,
-      `Create a complete demo artifact for this AI consulting opportunity at ${companyName}.
+      `You are an expert data engineer. Generate realistic synthetic demo data for a prospect meeting.
+Return ONLY valid JSON, no markdown, no preamble. Keep all string values under 12 words.`,
+      `Create a demo artifact for this opportunity at ${companyName}.
 
 Opportunity: ${opportunity.title}
 Problem: ${opportunity.problem}
 Solution: ${opportunity.solution}
-Business value: ${opportunity.value}
 
-What the demo plan says we need from the client:
-${(demoPlan?.whatWeNeedFromClient || []).map((item: string, i: number) => `${i+1}. ${item}`).join('\n')}
-
-What we said we would do:
-${(demoPlan?.whatWeWillDo || []).map((item: string, i: number) => `${i+1}. ${item}`).join('\n')}
-
-Generate a complete demo artifact with realistic synthetic data. Return exactly this JSON shape:
-
+Return exactly this JSON shape:
 {
-  "title": "demo title",
-  "description": "one sentence what this demo shows",
+  "title": "demo title (6 words max)",
+  "description": "one sentence what this shows",
   "datasets": [
     {
-      "name": "dataset name (e.g. Sales History)",
+      "name": "dataset name",
       "description": "what this data represents",
-      "columns": ["col1", "col2", "col3"],
+      "columns": ["col1", "col2", "col3", "col4"],
       "rows": [
-        ["val1", "val2", "val3"],
-        ["val1", "val2", "val3"]
+        ["val1", "val2", "val3", "val4"]
       ],
-      "note": "brief note about this dataset"
+      "note": "brief note"
     }
   ],
   "insights": [
     {
-      "title": "insight title",
-      "value": "the key number or finding",
-      "description": "what this means for the business",
-      "type": "positive|negative|warning|neutral"
+      "title": "insight title (4 words)",
+      "value": "key metric",
+      "description": "what this means (8 words max)",
+      "type": "positive"
     }
   ],
   "chartData": {
     "title": "chart title",
-    "type": "line|bar",
+    "type": "bar",
     "labels": ["label1", "label2"],
     "datasets": [
       {
         "name": "series name",
-        "values": [10, 20, 30],
-        "color": "blue|red|green|amber"
+        "values": [10, 20],
+        "color": "blue"
       }
     ]
   },
   "keyFindings": ["finding 1", "finding 2", "finding 3"],
-  "nextSteps": ["next step 1", "next step 2", "next step 3"]
+  "nextSteps": ["step 1", "step 2", "step 3"]
 }
 
-Make the data very specific to ${companyName} and their industry. Use realistic numbers, SKU names, dates, dollar amounts. Generate at least 12 rows per dataset. Keep each dataset to 4-5 columns max. Generate 4-6 insights. Chart should have 8-12 labels with realistic values.`,
-      3000
+Rules:
+- datasets: exactly 1 dataset, exactly 10 rows, exactly 4 columns
+- insights: exactly 4 items, types: positive/negative/warning/neutral
+- chartData: exactly 10 labels with realistic values specific to ${companyName}
+- keyFindings: exactly 3 items, each under 15 words
+- nextSteps: exactly 3 items, each under 12 words
+- Make data very specific to ${companyName} and their industry with realistic numbers`,
+      2500
     );
 
     await prisma.opportunity.update({
