@@ -17,6 +17,12 @@ function SendEmailButton({ msg, contactEmail }: { msg: any; contactEmail?: strin
 
   async function send() {
     if (!toEmail.trim()) { setShowInput(true); return; }
+    const placeholders = [...new Set([...`${msg.subject || ''}\n${msg.body || ''}`.matchAll(/\[[^\]]+\]/g)].map(m => m[0]))];
+    if (placeholders.length) {
+      setError(`Fill in ${placeholders.join(', ')} before sending.`);
+      setShowInput(false);
+      return;
+    }
     setSending(true);
     setError('');
     try {

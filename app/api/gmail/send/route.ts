@@ -13,6 +13,19 @@ export async function POST(req: NextRequest) {
   const { to, subject, body, outreachMessageId } = await req.json();
   if (!to || !body) return NextResponse.json({ error: 'Recipient and body are required' }, { status: 400 });
 
+  // Guard against sending a template with unfilled placeholders like [Name] or
+  // [Your Name]. In outreach copy, square-bracket tokens are always slots the
+  // user is meant to fill in, so refuse to send while any remain.
+  const placeholders = [
+    ...new Set([...`${subject || ''}`.matchAll(/\[[^\]]+\]/g), ...`${body}`.matchAll(/\[[^\]]+\]/g)].map(m => m[0])),
+  ];
+  if (placeholders.length) {
+    return NextResponse.json(
+      { error: `Email still has unfilled placeholders: ${placeholders.join(', ')}. Edit the message before sending.` },
+      { status: 400 }
+    );
+  }
+
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.gmailConnected || !user.googleRefreshToken) {
     return NextResponse.json({ error: 'Gmail not connected. Go to Settings to connect your Gmail account.' }, { status: 400 });
