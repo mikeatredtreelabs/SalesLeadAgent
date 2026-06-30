@@ -15,6 +15,16 @@ export async function GET(req: NextRequest) {
     const client = getGoogleOAuthClient();
     const { tokens } = await client.getToken(code);
 
+    // The send route needs gmail.send. Google's granular consent lets users
+    // decline individual scopes, so verify it was actually granted before we
+    // mark the account connected — otherwise sending fails later with a
+    // cryptic "insufficient authentication scopes" error.
+    const SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
+    const grantedScopes = (tokens.scope || '').split(' ');
+    if (!grantedScopes.includes(SEND_SCOPE)) {
+      return NextResponse.redirect(new URL('/settings?gmail=insufficient_scope', req.url));
+    }
+
     await prisma.user.update({
       where: { id: (session.user as any).id },
       data: {

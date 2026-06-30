@@ -35,6 +35,11 @@ export default function GmailConnectCard({ connected, email }: { connected: bool
           Connection failed. Please try again.
         </div>
       )}
+      {gmailStatus === 'insufficient_scope' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4 text-sm text-amber-700">
+          The <span className="font-medium">&ldquo;Send email on your behalf&rdquo;</span> permission wasn&rsquo;t granted, so sending won&rsquo;t work. Click Connect Gmail again and make sure that checkbox is ticked on Google&rsquo;s consent screen.
+        </div>
+      )}
 
       {connected ? (
         <div>
