@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "free-port-3000",
+      "type": "process",
+      "command": "node",
+      "args": ["scripts/free-port.mjs"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "silent", "panel": "shared", "close": true },
+      "problemMatcher": []
+    }
+  ]
+}
