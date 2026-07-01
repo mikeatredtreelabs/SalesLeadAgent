@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { runAgent } from '@/lib/ai';
+import { fetchSiteText } from '@/lib/site';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -13,23 +14,7 @@ export async function POST(req: NextRequest) {
   const domain = website.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
 
   // Fetch website content
-  let siteContent = '';
-  try {
-    const res = await fetch(`https://${domain}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research-bot/1.0)' },
-      signal: AbortSignal.timeout(8000),
-    });
-    const html = await res.text();
-    siteContent = html
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 3000);
-  } catch {
-    siteContent = `Company website: ${domain}`;
-  }
+  const siteContent = await fetchSiteText(website);
 
   // Build filter instructions
   const sizeInstruction = sizeRanges?.length > 0

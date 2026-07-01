@@ -48,6 +48,58 @@ export default function DiscoverPage() {
   const [apolloImporting, setApolloImporting] = useState<Set<string>>(new Set());
   const [showApollo, setShowApollo] = useState(false);
 
+  // Single-company research state
+  const [researchWebsite, setResearchWebsite] = useState('');
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [researchStep, setResearchStep] = useState('');
+  const [researchError, setResearchError] = useState('');
+  const [researchLeadId, setResearchLeadId] = useState('');
+
+  // Run one agent against a lead; throw so the caller can stop the pipeline.
+  async function runAgentStep(leadId: string, agent: string, input?: string) {
+    const res = await fetch(`/api/leads/${leadId}/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent, input }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `${agent} agent failed`);
+    }
+  }
+
+  // Enter a single company -> create + enrich the lead, then run
+  // Research -> Score -> Opportunities and open the finished lead.
+  async function researchCompany() {
+    if (!researchWebsite.trim() || researchLoading) return;
+    setResearchError(''); setResearchLeadId(''); setResearchLoading(true);
+    try {
+      setResearchStep('Enriching company and reading their site…');
+      const createRes = await fetch('/api/leads/research-company', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ website: researchWebsite.trim() }),
+      });
+      const created = await createRes.json();
+      if (!createRes.ok) throw new Error(created.error || 'Could not create the lead.');
+      const { leadId, siteContent } = created;
+      setResearchLeadId(leadId);
+
+      setResearchStep('Researching the company…');
+      await runAgentStep(leadId, 'research', siteContent);
+      setResearchStep('Scoring the lead…');
+      await runAgentStep(leadId, 'score');
+      setResearchStep('Finding AI opportunities…');
+      await runAgentStep(leadId, 'opportunities');
+
+      setResearchStep('Done — opening the lead…');
+      router.push(`/leads/${leadId}`);
+    } catch (e: any) {
+      setResearchError(e.message || 'Research failed.');
+      setResearchLoading(false);
+    }
+  }
+
   function toggleCompSize(label: string) {
     setCompSizes(s => s.includes(label) ? s.filter(x => x !== label) : [...s, label]);
   }
@@ -174,7 +226,47 @@ export default function DiscoverPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-slate-900">Discover leads</h1>
-        <p className="text-sm text-slate-500 mt-1">Find competitors of any company or search by industry</p>
+        <p className="text-sm text-slate-500 mt-1">Research one company, find competitors, or search by industry</p>
+      </div>
+
+      {/* ── Research a single company ── */}
+      <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 mb-6 text-white">
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles size={16} />
+          <h2 className="text-sm font-semibold">Research a company</h2>
+        </div>
+        <p className="text-xs text-blue-100 mb-5">Enter a company website — AI reads their site, then researches, scores, and finds AI opportunities automatically.</p>
+
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <Globe size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300" />
+            <input value={researchWebsite} onChange={e => { setResearchWebsite(e.target.value); setResearchError(''); }}
+              onKeyDown={e => e.key === 'Enter' && researchCompany()}
+              disabled={researchLoading}
+              placeholder="interrainternational.com"
+              className="w-full pl-9 pr-4 py-2.5 rounded-lg text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-70" />
+          </div>
+          <button onClick={researchCompany} disabled={researchLoading || !researchWebsite.trim()}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-50 disabled:opacity-60 transition-colors whitespace-nowrap">
+            {researchLoading ? <><Loader2 size={14} className="animate-spin" />Working…</> : <><Sparkles size={14} />Research company</>}
+          </button>
+        </div>
+
+        {researchLoading && researchStep && (
+          <div className="flex items-center gap-2 mt-4 text-sm text-blue-50">
+            <Loader2 size={14} className="animate-spin flex-shrink-0" />
+            {researchStep}
+          </div>
+        )}
+        {researchError && (
+          <div className="flex flex-wrap items-center gap-2 mt-4 bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm">
+            <AlertCircle size={15} className="flex-shrink-0" />
+            <span>{researchError}</span>
+            {researchLeadId && (
+              <a href={`/leads/${researchLeadId}`} className="underline font-medium ml-1">Open the lead to finish manually →</a>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Competitor Finder ── */}
