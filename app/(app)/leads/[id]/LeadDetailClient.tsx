@@ -8,16 +8,16 @@ import ScoreBadge from '@/components/ScoreBadge';
 
 const ALL_STATUSES = Object.keys(STATUS_COLORS);
 
-function SendEmailButton({ msg, contactEmail }: { msg: any; contactEmail?: string }) {
+function SendEmailButton({ subject, body, messageId, contactEmail, alreadySent }: { subject?: string; body: string; messageId: string; contactEmail?: string; alreadySent?: boolean }) {
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(!!msg.sentAt);
+  const [sent, setSent] = useState(!!alreadySent);
   const [error, setError] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [toEmail, setToEmail] = useState(contactEmail || '');
 
   async function send() {
     if (!toEmail.trim()) { setShowInput(true); return; }
-    const placeholders = [...new Set([...`${msg.subject || ''}\n${msg.body || ''}`.matchAll(/\[[^\]]+\]/g)].map(m => m[0]))];
+    const placeholders = [...new Set([...`${subject || ''}\n${body || ''}`.matchAll(/\[[^\]]+\]/g)].map(m => m[0]))];
     if (placeholders.length) {
       setError(`Fill in ${placeholders.join(', ')} before sending.`);
       setShowInput(false);
@@ -29,7 +29,7 @@ function SendEmailButton({ msg, contactEmail }: { msg: any; contactEmail?: strin
       const res = await fetch('/api/gmail/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: toEmail, subject: msg.subject, body: msg.body, outreachMessageId: msg.id }),
+        body: JSON.stringify({ to: toEmail, subject, body, outreachMessageId: messageId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Send failed');
@@ -65,6 +65,69 @@ function SendEmailButton({ msg, contactEmail }: { msg: any; contactEmail?: strin
         {sending ? 'Sending...' : showInput ? 'Confirm send' : 'Send via Gmail'}
       </button>
       {error && <span className="text-xs text-red-500">{error}</span>}
+    </div>
+  );
+}
+
+function OutreachCard({ msg, contactEmail }: { msg: any; contactEmail?: string }) {
+  const hasSubject = msg.type !== 'linkedin';
+  const [baseSubject, setBaseSubject] = useState(msg.subject || '');
+  const [baseBody, setBaseBody] = useState(msg.editedBody ?? msg.body ?? '');
+  const [subject, setSubject] = useState(baseSubject);
+  const [body, setBody] = useState(baseBody);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const dirty = subject !== baseSubject || body !== baseBody;
+
+  const typeLabel = msg.type === 'shortEmail' ? 'Short email' : msg.type === 'linkedin' ? 'LinkedIn message' : 'Executive email';
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/outreach/${msg.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: hasSubject ? subject : null, body }),
+      });
+      if (res.ok) {
+        setBaseSubject(subject);
+        setBaseBody(body);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch {
+      /* network error — leave dirty so the user can retry */
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-semibold text-slate-700">{typeLabel}</span>
+        <div className="flex items-center gap-2">
+          {hasSubject && <SendEmailButton subject={subject} body={body} messageId={msg.id} contactEmail={contactEmail} alreadySent={!!msg.sentAt} />}
+          <CopyBtn text={hasSubject && subject ? `Subject: ${subject}\n\n${body}` : body} />
+        </div>
+      </div>
+      {hasSubject && (
+        <div className="mb-2">
+          <label className="text-xs font-medium text-slate-500">Subject</label>
+          <input value={subject} onChange={e => setSubject(e.target.value)}
+            className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50" />
+        </div>
+      )}
+      <textarea value={body} onChange={e => setBody(e.target.value)}
+        rows={Math.min(18, Math.max(6, body.split('\n').length + 1))}
+        className="w-full text-sm text-slate-700 leading-relaxed bg-slate-50 rounded-lg p-3 border border-slate-200 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 resize-y" />
+      <div className="flex items-center gap-2 mt-2">
+        <button onClick={save} disabled={!dirty || saving}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+          {saving ? 'Saving...' : saved ? 'Saved' : 'Save changes'}
+        </button>
+        {dirty && <span className="text-xs text-amber-600">Unsaved changes</span>}
+      </div>
     </div>
   );
 }
@@ -763,17 +826,7 @@ export default function LeadDetailClient({ lead: initialLead }: { lead: any }) {
             </div>
           ) : (
             lead.outreach.map((msg: any) => (
-              <div key={msg.id} className="bg-white border border-slate-200 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold text-slate-700 capitalize">{msg.type === 'shortEmail' ? 'Short email' : msg.type === 'linkedin' ? 'LinkedIn message' : 'Executive email'}</span>
-                  <div className="flex items-center gap-2">
-                    {msg.type !== 'linkedin' && <SendEmailButton msg={msg} contactEmail={contact?.email} />}
-                    <CopyBtn text={msg.subject ? `Subject: ${msg.subject}\n\n${msg.body}` : msg.body} />
-                  </div>
-                </div>
-                {msg.subject && <p className="text-xs text-slate-500 mb-2 font-medium">Subject: <span className="text-slate-700">{msg.subject}</span></p>}
-                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-lg p-3">{msg.body}</p>
-              </div>
+              <OutreachCard key={msg.id} msg={msg} contactEmail={contact?.email} />
             ))
           )}
         </div>
