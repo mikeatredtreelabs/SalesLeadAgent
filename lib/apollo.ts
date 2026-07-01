@@ -174,15 +174,16 @@ export async function matchPersonEmail(
   return { ok: true, data: isLockedEmail(email) ? null : email };
 }
 
-/** Company search by industry/size — PAID tier. */
+/** Company search by industry/size/location — PAID tier. */
 export async function searchCompanies(
-  opts: { industries: string[]; minEmployees: number; maxEmployees: number; perPage?: number },
+  opts: { industries: string[]; minEmployees: number; maxEmployees: number; locations?: string[]; perPage?: number },
 ): Promise<ApolloOutcome<{ organizations: any[]; total: number }>> {
   const out = await apolloFetch<{ organizations?: any[]; pagination?: any }>(`/mixed_companies/search`, {
     method: 'POST',
     body: JSON.stringify({
       industry_tag_names: opts.industries,
       num_employees_ranges: [`${opts.minEmployees},${opts.maxEmployees}`],
+      organization_locations: opts.locations?.length ? opts.locations : undefined,
       page: 1,
       per_page: opts.perPage ?? 25,
     }),

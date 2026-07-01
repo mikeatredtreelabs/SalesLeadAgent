@@ -10,8 +10,12 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { industries, minEmployees, maxEmployees } = await req.json();
-  const search = await searchCompanies({ industries, minEmployees, maxEmployees });
+  const { industries, minEmployees, maxEmployees, region, count } = await req.json();
+  const search = await searchCompanies({
+    industries, minEmployees, maxEmployees,
+    locations: region ? [region] : undefined,
+    perPage: Math.min(Math.max(parseInt(count) || 25, 1), 25),
+  });
 
   if (!search.ok) {
     const status = search.reason === 'not_configured' ? 400 : search.reason === 'paid_required' ? 402 : 502;

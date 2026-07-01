@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Loader2, Building2, AlertCircle, Globe, CheckSquare, Square, ChevronDown, ChevronUp, Sparkles, Users, MapPin } from 'lucide-react';
+import { Search, Plus, Loader2, Building2, AlertCircle, Globe, CheckSquare, Square, Sparkles, Users, MapPin } from 'lucide-react';
 
 const INDUSTRIES = ['Logistics','Freight','Import/Export','Distribution','Wholesale','Manufacturing','Supply Chain','Transportation','Customs Brokerage','Trade Finance'];
 
@@ -37,16 +37,18 @@ export default function DiscoverPage() {
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState<Set<number>>(new Set());
 
-  // Apollo state
-  const [industries, setIndustries] = useState<string[]>([]);
-  const [min, setMin] = useState('10');
-  const [max, setMax] = useState('500');
-  const [apolloLoading, setApolloLoading] = useState(false);
-  const [apolloResults, setApolloResults] = useState<any[]>([]);
-  const [apolloError, setApolloError] = useState('');
-  const [apolloPaidRequired, setApolloPaidRequired] = useState(false);
-  const [apolloImporting, setApolloImporting] = useState<Set<string>>(new Set());
-  const [showApollo, setShowApollo] = useState(false);
+  // Industry search state
+  const [indSource, setIndSource] = useState<'ai' | 'apollo'>('ai');
+  const [indText, setIndText] = useState('');
+  const [indSizes, setIndSizes] = useState<string[]>([]);
+  const [indLocation, setIndLocation] = useState('');
+  const [indCustomLocation, setIndCustomLocation] = useState('');
+  const [indCount, setIndCount] = useState(10);
+  const [indLoading, setIndLoading] = useState(false);
+  const [indResults, setIndResults] = useState<any[]>([]);
+  const [indError, setIndError] = useState('');
+  const [indPaidRequired, setIndPaidRequired] = useState(false);
+  const [indImporting, setIndImporting] = useState<Set<string>>(new Set());
 
   // Single-company research state
   const [researchWebsite, setResearchWebsite] = useState('');
@@ -190,31 +192,90 @@ export default function DiscoverPage() {
     router.refresh();
   }
 
-  async function apolloSearch() {
-    if (!industries.length) return;
-    setApolloLoading(true); setApolloError(''); setApolloPaidRequired(false); setApolloResults([]);
-    const res = await fetch('/api/discover', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ industries, minEmployees: parseInt(min), maxEmployees: parseInt(max) }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setApolloPaidRequired(data.code === 'PAID_PLAN_REQUIRED');
-      setApolloError(data.error || 'Search failed');
-    } else setApolloResults(data.companies || []);
-    setApolloLoading(false);
+  // Resolve the industry-search filters shared by both data sources.
+  const indSizeRanges = indSizes.length > 0
+    ? SIZE_FILTERS.filter(s => indSizes.includes(s.label)).map(s => ({ min: s.min, max: s.max }))
+    : null;
+  const indActiveRegion = indCustomLocation.trim()
+    || LOCATION_PRESETS.find(p => p.label === indLocation)?.region
+    || '';
+
+  function toggleIndSize(label: string) {
+    setIndSizes(s => s.includes(label) ? s.filter(x => x !== label) : [...s, label]);
   }
 
-  async function apolloImport(company: any) {
-    setApolloImporting(s => new Set(s).add(company.companyName));
-    await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(company) });
+  async function industrySearch() {
+    if (!indText.trim() || indLoading) return;
+    setIndLoading(true); setIndError(''); setIndPaidRequired(false); setIndResults([]);
+    try {
+      let data: any;
+      if (indSource === 'ai') {
+        const res = await fetch('/api/industry-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ industry: indText.trim(), region: indActiveRegion || null, sizeRanges: indSizeRanges, count: indCount }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Search failed');
+      } else {
+        const minEmployees = indSizeRanges ? Math.min(...indSizeRanges.map(r => r.min)) : 1;
+        const maxEmployees = indSizeRanges ? Math.max(...indSizeRanges.map(r => r.max)) : 100000;
+        const res = await fetch('/api/discover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ industries: [indText.trim()], minEmployees, maxEmployees, region: indActiveRegion || null, count: indCount }),
+        });
+        data = await res.json();
+        if (!res.ok) {
+          setIndPaidRequired(data.code === 'PAID_PLAN_REQUIRED');
+          throw new Error(data.error || 'Search failed');
+        }
+      }
+      setIndResults(data.companies || []);
+    } catch (e: any) {
+      setIndError(e.message || 'Search failed');
+    }
+    setIndLoading(false);
+  }
+
+  async function industryImport(company: any) {
+    setIndImporting(s => new Set(s).add(company.companyName));
+    // Enrich firmographics (free) and, if the result has no contact, try Apollo (paid, graceful).
+    let firm: any = null;
+    let contact = company.contact || null;
+    if (company.website) {
+      const [enrichData, contactData] = await Promise.all([
+        fetch('/api/apollo-enrich', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ website: company.website, companyName: company.companyName }),
+        }).then(r => r.json()).catch(() => null),
+        contact ? Promise.resolve(null) : fetch('/api/apollo-contacts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ website: company.website, companyName: company.companyName }),
+        }).then(r => r.json()).catch(() => null),
+      ]);
+      firm = enrichData?.firmographics || null;
+      if (!contact) contact = contactData?.contacts?.[0] || null;
+    }
+    await fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyName: company.companyName,
+        website: firm?.website || company.website,
+        industry: firm?.industry || company.industry,
+        location: firm?.location || company.location,
+        size: firm?.size || company.size,
+        notes: company.reason || '',
+        source: indSource === 'ai' ? `Industry search: ${indText.trim()}` : 'Apollo Discovery',
+        contact,
+      }),
+    });
     router.refresh();
   }
 
   const availableToSelect = compResult?.competitors?.map((_: any, i: number) => i)?.filter((i: number) => !importDone.has(i)) ?? [];
   const allSelected = availableToSelect.length > 0 && availableToSelect.every((i: number) => selected.has(i));
-  const f = "px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:border-blue-400 bg-white w-20 text-center";
 
   // Active filter summary
   const activeFilters = [
@@ -439,84 +500,152 @@ export default function DiscoverPage() {
         )}
       </div>
 
-      {/* ── Apollo section (collapsible) ── */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <button onClick={() => setShowApollo(s => !s)}
-          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
-          <div>
-            <p className="text-sm font-semibold text-slate-800">Apollo.io industry search</p>
-            <p className="text-xs text-slate-500">Search for companies by industry and size — requires a paid Apollo plan</p>
+      {/* ── Search by industry ── */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Search size={16} className="text-blue-600" />
+            <h2 className="text-sm font-semibold text-slate-800">Search by industry</h2>
           </div>
-          {showApollo ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-        </button>
-        {showApollo && (
-          <div className="px-6 pb-6 border-t border-slate-100 pt-5">
-            <div className="mb-4">
-              <p className="text-xs font-medium text-slate-500 mb-2">Industries</p>
-              <div className="flex flex-wrap gap-2">
-                {INDUSTRIES.map(i => (
-                  <button key={i} onClick={() => setIndustries(s => s.includes(i) ? s.filter(x => x !== i) : [...s, i])}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${industries.includes(i) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                    {i}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-xs text-slate-500">Employees:</span>
-              <input value={min} onChange={e => setMin(e.target.value)} className={f} placeholder="10" />
-              <span className="text-xs text-slate-400">to</span>
-              <input value={max} onChange={e => setMax(e.target.value)} className={f} placeholder="500" />
-            </div>
-            <button onClick={apolloSearch} disabled={apolloLoading || !industries.length}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors mb-4">
-              {apolloLoading ? <><Loader2 size={14} className="animate-spin" />Searching...</> : <><Search size={14} />Search Apollo</>}
+          {/* Data source toggle */}
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+            <button onClick={() => setIndSource('ai')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${indSource === 'ai' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              AI-generated
             </button>
-            {apolloError && apolloPaidRequired && (
-              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 text-sm text-amber-800">
-                <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-medium">Apollo industry search needs a paid Apollo plan.</p>
-                  <p className="text-xs text-amber-700 mt-0.5">Your free key still enriches company firmographics automatically when you import leads from the competitor finder above. <a href="https://app.apollo.io/#/settings/plans/upgrade" target="_blank" rel="noreferrer" className="underline font-medium">Upgrade Apollo</a> to unlock industry search and contact emails.</p>
+            <button onClick={() => setIndSource('apollo')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${indSource === 'apollo' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              Apollo real data
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mb-5">
+          {indSource === 'ai'
+            ? 'Type an industry — AI lists real companies in the locations and sizes you pick.'
+            : 'Authoritative Apollo firmographic search — requires a paid Apollo plan.'}
+        </p>
+
+        {/* Industry input + quick picks */}
+        <div className="flex gap-3 mb-4">
+          <div className="relative flex-1">
+            <Building2 size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={indText} onChange={e => { setIndText(e.target.value); setIndError(''); }}
+              onKeyDown={e => e.key === 'Enter' && industrySearch()}
+              placeholder="e.g. Logistics, Freight, Customs Brokerage"
+              className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-white" />
+          </div>
+          <button onClick={industrySearch} disabled={indLoading || !indText.trim()}
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap">
+            {indLoading ? <><Loader2 size={14} className="animate-spin" />Searching…</> : <><Search size={14} />Search</>}
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {INDUSTRIES.map(i => (
+            <button key={i} onClick={() => { setIndText(i); setIndError(''); }}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${indText === i ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+              {i}
+            </button>
+          ))}
+        </div>
+
+        {/* Filters: location + size + count */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2"><MapPin size={13} className="text-slate-500" /><p className="text-xs font-semibold text-slate-600">Location</p></div>
+              {(indLocation || indCustomLocation) && <button onClick={() => { setIndLocation(''); setIndCustomLocation(''); }} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>}
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 mb-2">
+              {LOCATION_PRESETS.map(p => {
+                const active = indLocation === p.label && !indCustomLocation;
+                return (
+                  <button key={p.label} onClick={() => { setIndLocation(prev => prev === p.label ? '' : p.label); setIndCustomLocation(''); }}
+                    className={`px-2.5 py-2 rounded-lg border text-xs font-medium text-left transition-all ${active ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300 hover:bg-blue-50'}`}>
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+            <input value={indCustomLocation} onChange={e => { setIndCustomLocation(e.target.value); setIndLocation(''); }}
+              placeholder="Custom: e.g. Dallas TX…"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-white placeholder-slate-400" />
+          </div>
+          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2"><Users size={13} className="text-slate-500" /><p className="text-xs font-semibold text-slate-600">Company size</p></div>
+              {indSizes.length > 0 && <button onClick={() => setIndSizes([])} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>}
+            </div>
+            <div className="space-y-2 mb-4">
+              {SIZE_FILTERS.map(s => {
+                const active = indSizes.includes(s.label);
+                return (
+                  <button key={s.label} onClick={() => toggleIndSize(s.label)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-all ${active ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50'}`}>
+                    <span className="text-sm font-medium">{s.label}</span>
+                    <span className={`text-xs ${active ? 'text-blue-100' : 'text-slate-400'}`}>{s.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600">Results:</span>
+              {[6, 10, 20].map(n => (
+                <button key={n} onClick={() => setIndCount(n)}
+                  className={`px-3 py-1 rounded-lg border text-xs font-medium transition-all ${indCount === n ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {indError && indPaidRequired && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 text-sm text-amber-800">
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">Apollo real-data search needs a paid Apollo plan.</p>
+              <p className="text-xs text-amber-700 mt-0.5">Switch to <button onClick={() => { setIndSource('ai'); setIndError(''); }} className="underline font-medium">AI-generated</button> to search now on your free key, or <a href="https://app.apollo.io/#/settings/plans/upgrade" target="_blank" rel="noreferrer" className="underline font-medium">upgrade Apollo</a> for authoritative data.</p>
+            </div>
+          </div>
+        )}
+        {indError && !indPaidRequired && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4 text-sm text-red-700">
+            <AlertCircle size={15} />{indError}
+          </div>
+        )}
+
+        {indResults.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs text-slate-400 mb-1">{indResults.length} {indSource === 'ai' ? 'AI-suggested' : 'Apollo'} companies{indActiveRegion ? ' · filtered by location' : ''}</p>
+            {indResults.map((c, i) => (
+              <div key={i} className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5">
+                <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Building2 size={14} className="text-slate-400" />
                 </div>
-              </div>
-            )}
-            {apolloError && !apolloPaidRequired && (
-              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4 text-sm text-red-700">
-                <AlertCircle size={15} />{apolloError}
-              </div>
-            )}
-            {apolloResults.length > 0 && (
-              <div className="space-y-2">
-                {apolloResults.map((c, i) => (
-                  <div key={i} className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5">
-                    <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Building2 size={14} className="text-slate-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800">{c.companyName}</p>
-                      <p className="text-xs text-slate-500">{[c.industry, c.location, c.size].filter(Boolean).join(' · ')}</p>
-                    </div>
-                    {c.contact?.name ? (
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
-                        <Users size={12} className="text-emerald-600" />
-                        <div>
-                          <p className="text-xs font-medium text-emerald-800">{c.contact.name}</p>
-                          <p className="text-xs text-emerald-600">{c.contact.title}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400 px-3 py-1.5">No contact found</span>
-                    )}
-                    <button onClick={() => apolloImport(c)} disabled={apolloImporting.has(c.companyName)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 disabled:opacity-50 transition-colors flex-shrink-0">
-                      {apolloImporting.has(c.companyName) ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                      {apolloImporting.has(c.companyName) ? 'Added' : 'Add lead'}
-                    </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-slate-800">{c.companyName}</p>
+                    {c.website && <a href={`https://${c.website}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="text-xs text-blue-500 hover:underline">{c.website}</a>}
                   </div>
-                ))}
+                  <p className="text-xs text-slate-500">{[c.industry, c.location, c.size].filter(Boolean).join(' · ')}</p>
+                  {c.reason && <p className="text-xs text-slate-400 mt-0.5 italic">{c.reason}</p>}
+                </div>
+                {c.contact?.name && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg flex-shrink-0">
+                    <Users size={12} className="text-emerald-600" />
+                    <div>
+                      <p className="text-xs font-medium text-emerald-800">{c.contact.name}</p>
+                      <p className="text-xs text-emerald-600">{c.contact.title}</p>
+                    </div>
+                  </div>
+                )}
+                <button onClick={() => industryImport(c)} disabled={indImporting.has(c.companyName)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 disabled:opacity-50 transition-colors flex-shrink-0">
+                  {indImporting.has(c.companyName) ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                  {indImporting.has(c.companyName) ? 'Added' : 'Add lead'}
+                </button>
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>
