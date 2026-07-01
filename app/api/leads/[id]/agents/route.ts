@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { runAgent } from '@/lib/ai';
+import { runAgent, stripEmphasisDashes } from '@/lib/ai';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -124,6 +124,7 @@ Keep every string under 15 words. Be industry-specific.`,
       const result = await runAgent(
         `You write outreach messages for an AI consultant. Return ONLY valid JSON.
 Rules: Specific pain point opening. Reference something real about the company. Under 120 words email, 60 words LinkedIn. No hype, no "leverage/transform". One CTA: 15-min call.
+Never use em-dashes or en-dashes (— or –); they read as AI-written. Use a comma or semicolon instead. Regular hyphens in compound words (e.g. "AI-powered") are fine.
 {
   "shortEmail": { "subject": "subject", "body": "body" },
   "linkedin": { "body": "body" },
@@ -138,9 +139,9 @@ My background: AI consulting for logistics/trade/distribution, C# and Azure spec
       );
       await prisma.outreachMessage.deleteMany({ where: { leadId } });
       const msgs = [
-        { leadId, type: 'shortEmail', subject: result.shortEmail?.subject, body: result.shortEmail?.body || '' },
-        { leadId, type: 'linkedin', subject: null, body: result.linkedin?.body || '' },
-        { leadId, type: 'executive', subject: result.executive?.subject, body: result.executive?.body || '' },
+        { leadId, type: 'shortEmail', subject: stripEmphasisDashes(result.shortEmail?.subject), body: stripEmphasisDashes(result.shortEmail?.body || '') },
+        { leadId, type: 'linkedin', subject: null, body: stripEmphasisDashes(result.linkedin?.body || '') },
+        { leadId, type: 'executive', subject: stripEmphasisDashes(result.executive?.subject), body: stripEmphasisDashes(result.executive?.body || '') },
       ];
       await prisma.outreachMessage.createMany({ data: msgs });
       await prisma.lead.update({ where: { id: leadId }, data: { status: ['Researching','Qualified'].includes(lead.status) ? 'Outreach Ready' : lead.status } });

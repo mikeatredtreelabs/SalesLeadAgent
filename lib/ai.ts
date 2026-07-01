@@ -2,6 +2,18 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Em-dashes and en-dashes read as an AI "tell" in outreach copy. Replace them
+// (and any surrounding spaces/tabs) with a comma, which reads naturally in prose.
+// Regular hyphens are left untouched, so compound words ("AI-powered") and number
+// ranges ("60-90") are preserved. Newlines around a dash are kept so lists/layout
+// don't collapse.
+export function stripEmphasisDashes<T>(value: T): T {
+  if (typeof value === 'string') {
+    return value.replace(/[ \t]*[—–][ \t]*/g, ', ') as unknown as T;
+  }
+  return value;
+}
+
 export async function runAgent(systemPrompt: string, userPrompt: string, maxTokens = 1200) {
   const msg = await client.messages.create({
     model: 'claude-sonnet-4-6',

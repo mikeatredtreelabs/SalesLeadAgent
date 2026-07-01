@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getGoogleOAuthClient, buildRawEmail } from '@/lib/google';
+import { stripEmphasisDashes } from '@/lib/ai';
 import { google } from 'googleapis';
 
 export async function POST(req: NextRequest) {
@@ -10,8 +11,14 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const userId = (session.user as any).id;
 
-  const { to, subject, body, outreachMessageId } = await req.json();
-  if (!to || !body) return NextResponse.json({ error: 'Recipient and body are required' }, { status: 400 });
+  const raw_ = await req.json();
+  const { to, outreachMessageId } = raw_;
+  if (!to || !raw_.body) return NextResponse.json({ error: 'Recipient and body are required' }, { status: 400 });
+
+  // Strip em-dashes/en-dashes so no email goes out with the AI "tell", regardless
+  // of whether the copy was AI-generated, pre-existing, or hand-edited.
+  const subject = stripEmphasisDashes(raw_.subject);
+  const body = stripEmphasisDashes(raw_.body);
 
   // Guard against sending a template with unfilled placeholders like [Name] or
   // [Your Name]. In outreach copy, square-bracket tokens are always slots the
