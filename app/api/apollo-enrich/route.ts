@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { searchDecisionMakers } from '@/lib/apollo';
+import { enrichOrganization } from '@/lib/apollo';
 
-// Decision-maker contact lookup by company — PAID Apollo tier. Reveals real
-// emails when the plan allows. Returns a structured PAID_PLAN_REQUIRED code so
-// the UI can prompt an upgrade instead of showing a raw 403.
+// Free-tier Apollo: enrich a company by website/domain into real firmographics
+// (industry, size, location, phone, LinkedIn). Used by the lead import flows.
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { website, companyName } = await req.json();
-  const out = await searchDecisionMakers({ domain: website, companyName, perPage: 5, revealEmails: true });
+  const out = await enrichOrganization(website || companyName);
 
   if (!out.ok) {
     const status = out.reason === 'not_configured' ? 400 : out.reason === 'paid_required' ? 402 : 502;
@@ -19,5 +18,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: out.message, code }, { status });
   }
 
-  return NextResponse.json({ contacts: out.data, total: out.data.length });
+  return NextResponse.json({ firmographics: out.data });
 }

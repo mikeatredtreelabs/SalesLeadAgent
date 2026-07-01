@@ -73,15 +73,23 @@ export default function CompetitorFinder() {
 
     for (const i of toImport) {
       const c = competitors[i];
+      // Enrich firmographics via the free Apollo tier; prefer real data over the AI guess.
+      let firm: any = null;
+      if (c.website) {
+        firm = await fetch('/api/apollo-enrich', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ website: c.website, companyName: c.name }),
+        }).then(r => r.json()).then(d => d.firmographics || null).catch(() => null);
+      }
       await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyName: c.name,
-          website: c.website,
-          industry: c.industry,
-          location: c.location,
-          size: c.size,
+          website: firm?.website || c.website,
+          industry: firm?.industry || c.industry,
+          location: firm?.location || c.location,
+          size: firm?.size || c.size,
           notes: `Competitor of ${company?.name}. ${c.reason}`,
           source: 'Competitor Research',
         }),

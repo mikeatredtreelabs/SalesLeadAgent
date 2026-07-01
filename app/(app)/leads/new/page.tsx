@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 const f = "w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 placeholder-slate-400 bg-white";
@@ -11,11 +11,44 @@ export default function NewLeadPage() {
   const [bulk, setBulk] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bulkText, setBulkText] = useState('');
+  const [enriching, setEnriching] = useState(false);
+  const [enrichMsg, setEnrichMsg] = useState('');
   const [form, setForm] = useState({
     companyName: '', website: '', industry: '', location: '', size: '',
     contactName: '', contactTitle: '', contactEmail: '', notes: '', source: '',
   });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  // Free-tier Apollo: pull real firmographics for the entered website.
+  async function enrich() {
+    if (!form.website.trim()) return;
+    setEnriching(true); setEnrichMsg('');
+    try {
+      const res = await fetch('/api/apollo-enrich', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ website: form.website.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEnrichMsg(data.code === 'PAID_PLAN_REQUIRED' ? 'Enrichment needs a paid Apollo plan.' : (data.error || 'Enrichment failed.'));
+      } else if (!data.firmographics) {
+        setEnrichMsg('No Apollo match for that domain.');
+      } else {
+        const fm = data.firmographics;
+        setForm(prev => ({
+          ...prev,
+          companyName: prev.companyName || fm.companyName || '',
+          industry: fm.industry || prev.industry,
+          location: fm.location || prev.location,
+          size: fm.size || prev.size,
+        }));
+        setEnrichMsg('Filled from Apollo.');
+      }
+    } catch {
+      setEnrichMsg('Enrichment failed.');
+    }
+    setEnriching(false);
+  }
 
   async function submit() {
     if (!form.companyName.trim()) return;
@@ -81,8 +114,16 @@ export default function NewLeadPage() {
               <input value={form.companyName} onChange={e => set('companyName', e.target.value)} className={f} placeholder="Hartwell Freight Solutions" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">Website</label>
-              <input value={form.website} onChange={e => set('website', e.target.value)} className={f} placeholder="hartwellfreight.com" />
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-slate-500">Website</label>
+                <button type="button" onClick={enrich} disabled={enriching || !form.website.trim()}
+                  className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors">
+                  {enriching ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                  {enriching ? 'Enriching...' : 'Auto-fill from Apollo'}
+                </button>
+              </div>
+              <input value={form.website} onChange={e => { set('website', e.target.value); setEnrichMsg(''); }} className={f} placeholder="hartwellfreight.com" />
+              {enrichMsg && <p className="text-xs text-slate-400 mt-1">{enrichMsg}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">Industry</label>

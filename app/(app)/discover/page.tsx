@@ -44,6 +44,7 @@ export default function DiscoverPage() {
   const [apolloLoading, setApolloLoading] = useState(false);
   const [apolloResults, setApolloResults] = useState<any[]>([]);
   const [apolloError, setApolloError] = useState('');
+  const [apolloPaidRequired, setApolloPaidRequired] = useState(false);
   const [apolloImporting, setApolloImporting] = useState<Set<string>>(new Set());
   const [showApollo, setShowApollo] = useState(false);
 
@@ -97,25 +98,35 @@ export default function DiscoverPage() {
     const toImport = [...selected];
     await Promise.all(toImport.map(async (i) => {
       const c = compResult.competitors[i];
-      // Try to find a decision-maker contact via Apollo before creating the lead
+      // Enrich firmographics (free Apollo tier) and look for a decision-maker
+      // contact (paid tier — degrades to null on a free key) in parallel.
       let contact = null;
+      let firm: any = null;
       if (c.website) {
-        try {
-          const contactRes = await fetch('/api/apollo-contacts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+        const [contactData, enrichData] = await Promise.all([
+          fetch('/api/apollo-contacts', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ website: c.website, companyName: c.companyName }),
-          });
-          const contactData = await contactRes.json();
-          contact = contactData.contacts?.[0] || null;
-        } catch {}
+          }).then(r => r.json()).catch(() => null),
+          fetch('/api/apollo-enrich', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ website: c.website, companyName: c.companyName }),
+          }).then(r => r.json()).catch(() => null),
+        ]);
+        contact = contactData?.contacts?.[0] || null;
+        firm = enrichData?.firmographics || null;
       }
+      // Prefer Apollo's real firmographics; fall back to the AI's best guess.
       await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          companyName: c.companyName, website: c.website, industry: c.industry,
-          location: c.location, size: c.size, notes: c.reason,
+          companyName: c.companyName,
+          website: firm?.website || c.website,
+          industry: firm?.industry || c.industry,
+          location: firm?.location || c.location,
+          size: firm?.size || c.size,
+          notes: c.reason,
           source: `Competitor of ${compResult.companyName}`,
           contact,
         }),
@@ -129,15 +140,17 @@ export default function DiscoverPage() {
 
   async function apolloSearch() {
     if (!industries.length) return;
-    setApolloLoading(true); setApolloError(''); setApolloResults([]);
+    setApolloLoading(true); setApolloError(''); setApolloPaidRequired(false); setApolloResults([]);
     const res = await fetch('/api/discover', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ industries, minEmployees: parseInt(min), maxEmployees: parseInt(max) }),
     });
     const data = await res.json();
-    if (!res.ok) setApolloError(data.error || 'Search failed');
-    else setApolloResults(data.companies || []);
+    if (!res.ok) {
+      setApolloPaidRequired(data.code === 'PAID_PLAN_REQUIRED');
+      setApolloError(data.error || 'Search failed');
+    } else setApolloResults(data.companies || []);
     setApolloLoading(false);
   }
 
@@ -340,7 +353,7 @@ export default function DiscoverPage() {
           className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
           <div>
             <p className="text-sm font-semibold text-slate-800">Apollo.io industry search</p>
-            <p className="text-xs text-slate-500">Search for companies by industry and size — requires Apollo API key</p>
+            <p className="text-xs text-slate-500">Search for companies by industry and size — requires a paid Apollo plan</p>
           </div>
           {showApollo ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
         </button>
@@ -367,7 +380,16 @@ export default function DiscoverPage() {
               className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors mb-4">
               {apolloLoading ? <><Loader2 size={14} className="animate-spin" />Searching...</> : <><Search size={14} />Search Apollo</>}
             </button>
-            {apolloError && (
+            {apolloError && apolloPaidRequired && (
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 text-sm text-amber-800">
+                <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium">Apollo industry search needs a paid Apollo plan.</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Your free key still enriches company firmographics automatically when you import leads from the competitor finder above. <a href="https://app.apollo.io/#/settings/plans/upgrade" target="_blank" rel="noreferrer" className="underline font-medium">Upgrade Apollo</a> to unlock industry search and contact emails.</p>
+                </div>
+              </div>
+            )}
+            {apolloError && !apolloPaidRequired && (
               <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4 text-sm text-red-700">
                 <AlertCircle size={15} />{apolloError}
               </div>
