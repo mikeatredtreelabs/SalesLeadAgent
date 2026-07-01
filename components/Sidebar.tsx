@@ -5,8 +5,8 @@ import { LayoutDashboard, Building2, Plus, Search, ListTodo, Settings, Zap } fro
 
 const nav = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/leads', label: 'Leads', icon: Building2 },
   { href: '/discover', label: 'Discover', icon: Search },
+  { href: '/leads', label: 'Leads', icon: Building2 },
   { href: '/followups', label: 'Follow-ups', icon: ListTodo },
 ];
 
